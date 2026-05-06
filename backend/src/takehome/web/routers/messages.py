@@ -14,7 +14,10 @@ from starlette.responses import StreamingResponse
 from takehome.db.models import Message
 from takehome.db.session import get_session
 from takehome.services.conversation import get_conversation, update_conversation
-from takehome.services.document import get_document_for_conversation
+from takehome.services.document import (
+    get_documents_by_ids,
+    list_documents_for_conversation,
+)
 from takehome.services.llm import chat_with_document, count_sources_cited, generate_title
 
 logger = structlog.get_logger()
@@ -40,6 +43,7 @@ class MessageOut(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    document_ids: list[str] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -106,9 +110,18 @@ async def send_message(
 
     logger.info("User message saved", conversation_id=conversation_id, message_id=user_message.id)
 
-    # Load document text for the conversation
-    document = await get_document_for_conversation(session, conversation_id)
-    document_text: str | None = document.extracted_text if document else None
+    # Resolve which documents to include in the prompt context.
+    # When the client provides explicit document_ids, scope to those; otherwise
+    # use all documents in the conversation.
+    if body.document_ids:
+        documents = await get_documents_by_ids(session, body.document_ids)
+    else:
+        documents = await list_documents_for_conversation(session, conversation_id)
+
+    document_sections: list[tuple[str, str]] = []
+    for doc in documents:
+        if doc.extracted_text:
+            document_sections.append((doc.filename, doc.extracted_text))
 
     # Load conversation history (exclude the message we just saved, it will be the user_message param)
     stmt = (
@@ -135,7 +148,7 @@ async def send_message(
         try:
             async for chunk in chat_with_document(
                 user_message=body.content,
-                document_text=document_text,
+                document_sections=document_sections,
                 conversation_history=conversation_history,
             ):
                 full_response += chunk

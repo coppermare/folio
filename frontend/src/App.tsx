@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
-import { DocumentViewer } from "./components/DocumentViewer";
+import { WorkspacePanel } from "./components/WorkspacePanel";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
-import { useDocument } from "./hooks/use-document";
+import { useDocuments } from "./hooks/use-documents";
 import { useMessages } from "./hooks/use-messages";
 
 export default function App() {
@@ -28,33 +28,53 @@ export default function App() {
 	} = useMessages(selectedId);
 
 	const {
-		document,
-		upload,
-		refresh: refreshDocument,
-	} = useDocument(selectedId);
+		documents,
+		uploading,
+		uploadMany,
+		remove: removeDocument,
+		refresh: refreshDocuments,
+	} = useDocuments(selectedId);
 
 	const handleSend = useCallback(
-		async (content: string) => {
-			await send(content);
+		async (content: string, documentIds?: string[]) => {
+			await send(content, documentIds);
 			refreshConversations();
 		},
 		[send, refreshConversations],
 	);
 
 	const handleUpload = useCallback(
-		async (file: File) => {
-			const doc = await upload(file);
-			if (doc) {
-				refreshDocument();
+		async (files: File[]) => {
+			const uploaded = await uploadMany(files);
+			if (uploaded.length > 0) {
 				refreshConversations();
 			}
+			return uploaded;
 		},
-		[upload, refreshDocument, refreshConversations],
+		[uploadMany, refreshConversations],
+	);
+
+	const handleRemoveDocument = useCallback(
+		async (id: string) => {
+			await removeDocument(id);
+			refreshConversations();
+		},
+		[removeDocument, refreshConversations],
 	);
 
 	const handleCreate = useCallback(async () => {
 		await create();
 	}, [create]);
+
+	const ensureConversation = useCallback(async () => {
+		if (selectedId) return selectedId;
+		const created = await create();
+		if (created) {
+			// useDocuments and useMessages re-bind via the new selectedId effect.
+			refreshDocuments();
+		}
+		return created?.id ?? null;
+	}, [create, selectedId, refreshDocuments]);
 
 	return (
 		<TooltipProvider delayDuration={200}>
@@ -74,13 +94,21 @@ export default function App() {
 					error={messagesError}
 					streaming={streaming}
 					streamingContent={streamingContent}
-					hasDocument={!!document}
+					hasDocuments={documents.length > 0}
 					conversationId={selectedId}
+					documents={documents}
+					ensureConversation={ensureConversation}
 					onSend={handleSend}
 					onUpload={handleUpload}
 				/>
 
-				<DocumentViewer document={document} />
+				<WorkspacePanel
+					conversationId={selectedId}
+					documents={documents}
+					uploading={uploading}
+					onUpload={handleUpload}
+					onRemove={handleRemoveDocument}
+				/>
 			</div>
 		</TooltipProvider>
 	);

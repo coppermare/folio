@@ -23,13 +23,8 @@ async def upload_document(
     Validates the file is a PDF, saves it to disk, extracts text using PyMuPDF,
     and stores metadata in the database.
 
-    Raises ValueError if the conversation already has a document or the file is not a PDF.
+    Raises ValueError if the file is not a PDF or exceeds the size limit.
     """
-    # Check if conversation already has a document
-    existing = await get_document_for_conversation(session, conversation_id)
-    if existing is not None:
-        raise ValueError("Conversation already has a document. Only one document per conversation is allowed.")
-
     # Validate file type
     if file.content_type not in ("application/pdf", "application/x-pdf"):
         filename = file.filename or ""
@@ -105,10 +100,43 @@ async def get_document(session: AsyncSession, document_id: str) -> Document | No
     return result.scalar_one_or_none()
 
 
-async def get_document_for_conversation(
+async def list_documents_for_conversation(
     session: AsyncSession, conversation_id: str
-) -> Document | None:
-    """Get the document for a conversation, if one exists."""
-    stmt = select(Document).where(Document.conversation_id == conversation_id)
+) -> list[Document]:
+    """List all documents for a conversation, ordered by upload time."""
+    stmt = (
+        select(Document)
+        .where(Document.conversation_id == conversation_id)
+        .order_by(Document.uploaded_at.asc())
+    )
     result = await session.execute(stmt)
-    return result.scalar_one_or_none()
+    return list(result.scalars().all())
+
+
+async def get_documents_by_ids(
+    session: AsyncSession, document_ids: list[str]
+) -> list[Document]:
+    """Fetch a list of documents by their ids, preserving the input ordering."""
+    if not document_ids:
+        return []
+    stmt = select(Document).where(Document.id.in_(document_ids))
+    result = await session.execute(stmt)
+    docs = list(result.scalars().all())
+    by_id = {d.id: d for d in docs}
+    return [by_id[doc_id] for doc_id in document_ids if doc_id in by_id]
+
+
+async def delete_document(session: AsyncSession, document_id: str) -> bool:
+    """Delete a document and remove its file from disk. Returns True if it existed."""
+    document = await get_document(session, document_id)
+    if document is None:
+        return False
+    file_path = document.file_path
+    await session.delete(document)
+    await session.commit()
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+    except OSError:
+        logger.exception("Failed to remove file from disk", path=file_path)
+    return True

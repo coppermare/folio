@@ -3,7 +3,7 @@ export interface Conversation {
 	title: string;
 	created_at: string;
 	updated_at: string;
-	has_document: boolean;
+	document_count: number;
 }
 
 export interface Message {
@@ -23,6 +23,17 @@ export interface Document {
 	uploaded_at: string;
 }
 
-export interface ConversationDetail extends Conversation {
-	document?: Document;
+export interface ConversationDocument {
+	id: string;
+	filename: string;
+	page_count: number;
+	uploaded_at: string;
+}
+
+export interface ConversationDetail {
+	id: string;
+	title: string;
+	created_at: string;
+	updated_at: string;
+	documents: ConversationDocument[];
 }

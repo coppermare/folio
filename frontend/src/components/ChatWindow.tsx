@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useRef } from "react";
-import type { Message } from "../types";
+import { useCallback, useEffect, useRef } from "react";
+import * as api from "../lib/api";
+import type { ConversationDocument, Message } from "../types";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble, StreamingBubble } from "./MessageBubble";
@@ -11,10 +12,12 @@ interface ChatWindowProps {
 	error: string | null;
 	streaming: boolean;
 	streamingContent: string;
-	hasDocument: boolean;
+	hasDocuments: boolean;
 	conversationId: string | null;
-	onSend: (content: string) => void;
-	onUpload: (file: File) => void;
+	documents: ConversationDocument[];
+	ensureConversation: () => Promise<string | null>;
+	onSend: (content: string, documentIds?: string[]) => void | Promise<void>;
+	onUpload: (files: File[]) => Promise<{ id: string; filename: string }[]>;
 }
 
 export function ChatWindow({
@@ -23,14 +26,15 @@ export function ChatWindow({
 	error,
 	streaming,
 	streamingContent,
-	hasDocument,
+	hasDocuments,
 	conversationId,
+	documents,
+	ensureConversation,
 	onSend,
 	onUpload,
 }: ChatWindowProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
-	// Auto-scroll to bottom when new messages arrive or during streaming
 	const messagesLength = messages.length;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: messages and streamingContent are intentional triggers for auto-scroll
 	useEffect(() => {
@@ -39,75 +43,74 @@ export function ChatWindow({
 		}
 	}, [messagesLength, streamingContent]);
 
-	// No conversation selected
-	if (!conversationId) {
-		return (
-			<div className="flex flex-1 items-center justify-center bg-neutral-50">
-				<div className="text-center">
-					<p className="text-sm text-neutral-400">
-						Select a conversation or create a new one
-					</p>
-				</div>
-			</div>
-		);
-	}
+	const handleSend = useCallback(
+		async (
+			content: string,
+			attachments: { pending: File[]; referenceIds: string[] },
+		) => {
+			// Ensure we have a conversation before any uploads happen.
+			const cid = await ensureConversation();
+			if (!cid) return;
 
-	// Loading messages
-	if (loading) {
-		return (
-			<div className="flex flex-1 items-center justify-center bg-white">
-				<Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
-			</div>
-		);
-	}
+			// Upload pending files in parallel against this conversation.
+			let uploadedIds: string[] = [];
+			if (attachments.pending.length > 0) {
+				// Use the parent-provided onUpload when conversation ids match;
+				// otherwise upload directly so we land them in the freshly created one.
+				if (cid === conversationId) {
+					const uploaded = await onUpload(attachments.pending);
+					uploadedIds = uploaded.map((u) => u.id);
+				} else {
+					const results = await Promise.all(
+						attachments.pending.map((f) => api.uploadDocument(cid, f)),
+					);
+					uploadedIds = results.map((r) => r.id);
+				}
+			}
+			const documentIds = [...attachments.referenceIds, ...uploadedIds];
+			await onSend(content, documentIds.length > 0 ? documentIds : undefined);
+		},
+		[conversationId, ensureConversation, onSend, onUpload],
+	);
 
-	// Empty conversation - show upload prompt
-	if (messages.length === 0 && !streaming) {
-		return (
-			<div className="flex flex-1 flex-col bg-white">
-				<div className="flex flex-1 items-center justify-center">
-					{hasDocument ? (
-						<div className="text-center">
-							<p className="text-sm text-neutral-500">
-								Document uploaded. Ask a question to get started.
-							</p>
-						</div>
-					) : (
-						<EmptyState onUpload={onUpload} />
-					)}
-				</div>
-				<ChatInput
-					onSend={onSend}
-					onUpload={onUpload}
-					disabled={streaming}
-					hasDocument={hasDocument}
-				/>
-			</div>
-		);
-	}
+	const isEmpty = !loading && messages.length === 0 && !streaming;
 
 	return (
 		<div className="flex flex-1 flex-col bg-white">
-			{error && (
-				<div className="mx-4 mt-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
-					{error}
+			{!conversationId && !isEmpty && null}
+
+			{loading ? (
+				<div className="flex flex-1 items-center justify-center">
+					<Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
 				</div>
+			) : isEmpty ? (
+				<div className="flex flex-1 items-center justify-center">
+					<EmptyState hasDocuments={hasDocuments} />
+				</div>
+			) : (
+				<>
+					{error && (
+						<div className="mx-4 mt-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
+							{error}
+						</div>
+					)}
+					<div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
+						<div className="mx-auto max-w-2xl space-y-1">
+							{messages.map((message) => (
+								<MessageBubble key={message.id} message={message} />
+							))}
+							{streaming && <StreamingBubble content={streamingContent} />}
+						</div>
+					</div>
+				</>
 			)}
 
-			<div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
-				<div className="mx-auto max-w-2xl space-y-1">
-					{messages.map((message) => (
-						<MessageBubble key={message.id} message={message} />
-					))}
-					{streaming && <StreamingBubble content={streamingContent} />}
-				</div>
-			</div>
-
 			<ChatInput
-				onSend={onSend}
-				onUpload={onUpload}
+				onSend={handleSend}
 				disabled={streaming}
-				hasDocument={hasDocument}
+				availableDocuments={documents}
+				conversationId={conversationId}
+				ensureConversation={ensureConversation}
 			/>
 		</div>
 	);

@@ -37,7 +37,7 @@ export function useMessages(conversationId: string | null) {
 	}, [refresh]);
 
 	const send = useCallback(
-		async (content: string) => {
+		async (content: string, documentIds?: string[]) => {
 			if (!conversationId || streaming) return;
 
 			const userMessage: Message = {
@@ -55,7 +55,11 @@ export function useMessages(conversationId: string | null) {
 			setError(null);
 
 			try {
-				const response = await api.sendMessage(conversationId, content);
+				const response = await api.sendMessage(
+					conversationId,
+					content,
+					documentIds,
+				);
 
 				if (!response.body) {
 					throw new Error("No response body");

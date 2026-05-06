@@ -24,9 +24,16 @@ export async function createConversation(): Promise<Conversation> {
 	const res = await fetch(`${BASE}/conversations`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ title: "New conversation" }),
+		body: JSON.stringify({}),
 	});
-	return handleResponse<Conversation>(res);
+	const detail = await handleResponse<ConversationDetail>(res);
+	return {
+		id: detail.id,
+		title: detail.title,
+		created_at: detail.created_at,
+		updated_at: detail.updated_at,
+		document_count: detail.documents.length,
+	};
 }
 
 export async function deleteConversation(id: string): Promise<void> {
@@ -56,11 +63,16 @@ export async function fetchMessages(
 export async function sendMessage(
 	conversationId: string,
 	content: string,
+	documentIds?: string[],
 ): Promise<Response> {
+	const body: { content: string; document_ids?: string[] } = { content };
+	if (documentIds && documentIds.length > 0) {
+		body.document_ids = documentIds;
+	}
 	const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ content }),
+		body: JSON.stringify(body),
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => "Unknown error");
@@ -80,6 +92,16 @@ export async function uploadDocument(
 		body: formData,
 	});
 	return handleResponse<Document>(res);
+}
+
+export async function deleteDocument(documentId: string): Promise<void> {
+	const res = await fetch(`${BASE}/documents/${documentId}`, {
+		method: "DELETE",
+	});
+	if (!res.ok) {
+		const text = await res.text().catch(() => "Unknown error");
+		throw new Error(`API error ${res.status}: ${text}`);
+	}
 }
 
 export function getDocumentUrl(documentId: string): string {

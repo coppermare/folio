@@ -37,25 +37,26 @@ async def generate_title(user_message: str) -> str:
 
 async def chat_with_document(
     user_message: str,
-    document_text: str | None,
+    document_sections: list[tuple[str, str]],
     conversation_history: list[dict[str, str]],
 ) -> AsyncIterator[str]:
     """Stream a response to the user's message, yielding text chunks.
 
-    Builds a prompt that includes document context and conversation history,
-    then streams the response from the LLM.
+    `document_sections` is a list of (filename, extracted_text) tuples. When
+    multiple documents are provided, each is wrapped in a labelled <document>
+    block so the model can cite by filename.
     """
-    # Build the full prompt with context
     prompt_parts: list[str] = []
 
-    # Add document context if available
-    if document_text:
+    if document_sections:
         prompt_parts.append(
-            "The following is the content of the document being discussed:\n\n"
-            "<document>\n"
-            f"{document_text}\n"
-            "</document>\n"
+            "The following documents are available for reference. "
+            "When citing content, mention which document (by filename) it comes from.\n"
         )
+        for filename, text in document_sections:
+            prompt_parts.append(
+                f'<document filename="{filename}">\n{text}\n</document>\n'
+            )
     else:
         prompt_parts.append(
             "No document has been uploaded yet. If the user asks about a document, "
