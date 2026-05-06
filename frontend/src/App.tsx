@@ -1,10 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DocumentViewer } from "./components/DocumentViewer";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
-import { useDocument } from "./hooks/use-document";
+import { useDocuments } from "./hooks/use-documents";
 import { useMessages } from "./hooks/use-messages";
 
 export default function App() {
@@ -28,10 +28,19 @@ export default function App() {
 	} = useMessages(selectedId);
 
 	const {
-		document,
+		documents,
+		activeDocumentId,
+		setActiveDocumentId,
+		uploadingCount,
 		upload,
-		refresh: refreshDocument,
-	} = useDocument(selectedId);
+	} = useDocuments(selectedId);
+
+	const [toast, setToast] = useState<string | null>(null);
+	useEffect(() => {
+		if (!toast) return;
+		const timer = window.setTimeout(() => setToast(null), 3000);
+		return () => window.clearTimeout(timer);
+	}, [toast]);
 
 	const handleSend = useCallback(
 		async (content: string) => {
@@ -43,13 +52,15 @@ export default function App() {
 
 	const handleUpload = useCallback(
 		async (file: File) => {
-			const doc = await upload(file);
-			if (doc) {
-				refreshDocument();
+			const outcome = await upload(file);
+			if (!outcome) return;
+			if (outcome.duplicate) {
+				setToast(`"${outcome.document.filename}" is already in this conversation`);
+			} else {
 				refreshConversations();
 			}
 		},
-		[upload, refreshDocument, refreshConversations],
+		[upload, refreshConversations],
 	);
 
 	const handleCreate = useCallback(async () => {
@@ -74,13 +85,26 @@ export default function App() {
 					error={messagesError}
 					streaming={streaming}
 					streamingContent={streamingContent}
-					hasDocument={!!document}
+					documents={documents}
+					activeDocumentId={activeDocumentId}
+					uploadingCount={uploadingCount}
 					conversationId={selectedId}
 					onSend={handleSend}
 					onUpload={handleUpload}
+					onSelectDocument={setActiveDocumentId}
 				/>
 
-				<DocumentViewer document={document} />
+				<DocumentViewer
+					documents={documents}
+					activeDocumentId={activeDocumentId}
+					onSelect={setActiveDocumentId}
+				/>
+
+				{toast && (
+					<div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
+						{toast}
+					</div>
+				)}
 			</div>
 		</TooltipProvider>
 	);
