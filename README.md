@@ -1,10 +1,8 @@
-# Orbital — Product Engineering Take-Home
+# folio
 
-Welcome! This is a take-home assessment for a Product Engineering role at Orbital.
+Document Q&A for commercial real estate lawyers. Upload legal documents (leases, title reports, environmental assessments) into a conversation and ask questions about them; the AI answers grounded in the documents and cites which ones it used.
 
-You've been given a working baseline application: a document Q&A tool for commercial real estate lawyers. Users upload legal documents (leases, title reports, environmental assessments) and ask questions about them. The AI assistant answers questions grounded in the document content.
-
-The app works, but it has limitations. Your job is to extend it.
+A single conversation can hold many documents.
 
 ---
 
@@ -12,58 +10,57 @@ The app works, but it has limitations. Your job is to extend it.
 
 ### Prerequisites
 - Docker and Docker Compose
-- just (command runner) — install via `brew install just` or `cargo install just`
+- [`just`](https://github.com/casey/just) — install via `brew install just` or `cargo install just`
 
 That's it. Everything else runs inside containers.
 
-### Getting Started
+### Getting started
 
-1. Clone this repository
+1. Clone the repo.
 
-2. Run the setup command:
+2. Run setup:
 ```
 just setup
 ```
-   This copies `.env.example` to `.env` and builds the Docker images.
+This copies `.env.example` to `.env` and builds the Docker images.
 
 3. Add your Anthropic API key to `.env`:
 ```
 ANTHROPIC_API_KEY=your_key_here
 ```
-   We've provided an API key in the task email. You can also use your own.
 
 4. Start everything:
 ```
 just dev
 ```
-   This starts PostgreSQL, the FastAPI backend (port 8000), and the React frontend (port 5173).
-   Database migrations run automatically when the backend starts — no separate step needed.
+Brings up PostgreSQL, the FastAPI backend (port 8000), and the React frontend (port 5173). Database migrations run automatically when the backend starts — no separate step.
 
-5. Open http://localhost:5173 in your browser.
+5. Open http://localhost:5173.
 
-Your local `backend/src/` and `frontend/src/` directories are mounted into the containers —
-edit files normally on your machine and changes hot-reload automatically.
+`backend/src/` and `frontend/src/` are bind-mounted into the containers, so edits hot-reload.
 
-### Sample Documents
+### Sample documents
 
-We've included sample legal documents in `sample-docs/` for testing.
+`sample-docs/` contains three PDFs (commercial lease, title report, environmental assessment) for testing.
 
-### Project Structure
+### Project structure
 
-- `frontend/` — React frontend (Vite + Tailwind + shadcn/Radix UI)
-- `backend/` — FastAPI backend (Python 3.12 + SQLAlchemy + PydanticAI)
-- `alembic/` — Database migrations
-- `data/` — Product analytics and customer feedback (for Part 2)
-- `sample-docs/` — Sample PDF documents for testing
+- `frontend/` — React (Vite + Tailwind + shadcn/Radix UI)
+- `backend/` — FastAPI (Python 3.12 + SQLAlchemy + PydanticAI)
+- `alembic/` — database migrations
+- `data/` — product analytics and customer feedback used to inform design decisions
+- `sample-docs/` — sample PDFs
 
-### Useful Commands
+### Useful commands
 
-- `just dev` — Start full stack (Postgres + backend + frontend)
-- `just stop` — Stop all services
-- `just reset` — Stop everything and clear database
-- `just check` — Run all linters and type checks
-- `just fmt` — Format all code
-- `just db-init` — Run database migrations
-- `just db-shell` — Open a psql shell
-- `just shell-backend` — Shell into backend container
-- `just logs-backend` — Tail backend logs
+- `just dev` — start full stack
+- `just stop` — stop services
+- `just reset` — stop everything and clear the database
+- `just check` — run all linters and type checks
+- `just fmt` — format all code
+- `just db-init` — run database migrations (rarely needed; happens on backend startup)
+- `just db-shell` — open a psql shell
+- `just shell-backend` — shell into backend container
+- `just logs-backend` — tail backend logs
+
+For architecture, conventions, and non-obvious gotchas see [CLAUDE.md](CLAUDE.md).

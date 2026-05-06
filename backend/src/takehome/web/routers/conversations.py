@@ -23,12 +23,22 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 # --------------------------------------------------------------------------- #
 
 
+class DocumentInfo(BaseModel):
+    id: str
+    filename: str
+    page_count: int
+    uploaded_at: datetime
+    extraction_failed: bool = False
+
+    model_config = {"from_attributes": True}
+
+
 class ConversationListItem(BaseModel):
     id: str
     title: str
     created_at: datetime
     updated_at: datetime
-    has_document: bool
+    document_count: int
 
     model_config = {"from_attributes": True}
 
@@ -38,23 +48,9 @@ class ConversationDetail(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
-    has_document: bool
-    document: DocumentInfo | None = None
+    documents: list[DocumentInfo]
 
     model_config = {"from_attributes": True}
-
-
-class DocumentInfo(BaseModel):
-    id: str
-    filename: str
-    page_count: int
-    uploaded_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class ConversationCreate(BaseModel):
-    pass
 
 
 class ConversationUpdate(BaseModel):
@@ -66,11 +62,31 @@ class ConversationUpdate(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
+def _doc_info(doc) -> DocumentInfo:
+    return DocumentInfo(
+        id=doc.id,
+        filename=doc.filename,
+        page_count=doc.page_count,
+        uploaded_at=doc.uploaded_at,
+        extraction_failed=doc.extracted_text is None,
+    )
+
+
+def _detail(conversation) -> ConversationDetail:
+    docs = sorted(conversation.documents, key=lambda d: d.uploaded_at)
+    return ConversationDetail(
+        id=conversation.id,
+        title=conversation.title,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        documents=[_doc_info(d) for d in docs],
+    )
+
+
 @router.get("", response_model=list[ConversationListItem])
 async def list_conversations_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationListItem]:
-    """List all conversations, ordered by most recently updated."""
     conversations = await list_conversations(session)
     return [
         ConversationListItem(
@@ -78,7 +94,7 @@ async def list_conversations_endpoint(
             title=c.title,
             created_at=c.created_at,
             updated_at=c.updated_at,
-            has_document=len(c.documents) > 0,
+            document_count=len(c.documents),
         )
         for c in conversations
     ]
@@ -88,15 +104,13 @@ async def list_conversations_endpoint(
 async def create_conversation_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Create a new conversation."""
     conversation = await create_conversation(session)
     return ConversationDetail(
         id=conversation.id,
         title=conversation.title,
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
-        has_document=False,
-        document=None,
+        documents=[],
     )
 
 
@@ -105,29 +119,10 @@ async def get_conversation_endpoint(
     conversation_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Get a single conversation with its document info."""
     conversation = await get_conversation(session, conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
-    doc_info: DocumentInfo | None = None
-    if conversation.documents:
-        doc = conversation.documents[0]
-        doc_info = DocumentInfo(
-            id=doc.id,
-            filename=doc.filename,
-            page_count=doc.page_count,
-            uploaded_at=doc.uploaded_at,
-        )
-
-    return ConversationDetail(
-        id=conversation.id,
-        title=conversation.title,
-        created_at=conversation.created_at,
-        updated_at=conversation.updated_at,
-        has_document=doc_info is not None,
-        document=doc_info,
-    )
+    return _detail(conversation)
 
 
 @router.patch("/{conversation_id}", response_model=ConversationDetail)
@@ -136,29 +131,10 @@ async def update_conversation_endpoint(
     body: ConversationUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Update a conversation's title."""
     conversation = await update_conversation(session, conversation_id, body.title)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
-    doc_info: DocumentInfo | None = None
-    if conversation.documents:
-        doc = conversation.documents[0]
-        doc_info = DocumentInfo(
-            id=doc.id,
-            filename=doc.filename,
-            page_count=doc.page_count,
-            uploaded_at=doc.uploaded_at,
-        )
-
-    return ConversationDetail(
-        id=conversation.id,
-        title=conversation.title,
-        created_at=conversation.created_at,
-        updated_at=conversation.updated_at,
-        has_document=doc_info is not None,
-        document=doc_info,
-    )
+    return _detail(conversation)
 
 
 @router.delete("/{conversation_id}", status_code=204)
@@ -166,7 +142,6 @@ async def delete_conversation_endpoint(
     conversation_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    """Delete a conversation and all associated data."""
     deleted = await delete_conversation(session, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")
