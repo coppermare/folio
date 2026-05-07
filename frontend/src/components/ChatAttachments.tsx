@@ -1,4 +1,4 @@
-import { FileText, Loader2, Paperclip, X } from "lucide-react";
+import { FileText, Loader2, X } from "lucide-react";
 
 export interface PendingFile {
 	id: string;
@@ -28,11 +28,11 @@ export function ChatAttachments({
 	if (pendingFiles.length === 0 && references.length === 0) return null;
 
 	return (
-		<div className="flex flex-wrap gap-1.5 border-b border-neutral-100 px-3 py-2">
+		<div className="flex flex-wrap gap-1.5 px-3 py-2">
 			{references.map((ref) => (
 				<span
 					key={`ref-${ref.id}`}
-					className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-xs text-neutral-700"
+					className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-0.5 text-xs text-neutral-700"
 					title={ref.filename}
 				>
 					<FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
@@ -50,7 +50,7 @@ export function ChatAttachments({
 			{pendingFiles.map((p) => (
 				<span
 					key={`pending-${p.id}`}
-					className={`inline-flex max-w-[220px] items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+					className={`inline-flex max-w-[220px] items-center gap-1 rounded-lg border px-2 py-0.5 text-xs ${
 						p.error
 							? "border-red-200 bg-red-50 text-red-600"
 							: "border-neutral-200 bg-neutral-100 text-neutral-700"
@@ -60,7 +60,7 @@ export function ChatAttachments({
 					{p.uploading ? (
 						<Loader2 className="h-3 w-3 flex-shrink-0 animate-spin text-neutral-400" />
 					) : (
-						<Paperclip className="h-3 w-3 flex-shrink-0 text-neutral-400" />
+						<FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
 					)}
 					<span className="truncate">{p.file.name}</span>
 					<button

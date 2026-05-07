@@ -1,14 +1,18 @@
 import { motion } from "framer-motion";
-import { Bot } from "lucide-react";
-import { Streamdown } from "streamdown";
-import "streamdown/styles.css";
-import type { Message } from "../types";
+import { FileText } from "lucide-react";
+import { citedDocuments } from "../lib/file-chip-utils";
+import type { ConversationDocument, Message } from "../types";
+import { CopyButton } from "./CopyButton";
+import { FileChip } from "./FileChip";
+import { SmoothMarkdown } from "./SmoothMarkdown";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 
 interface MessageBubbleProps {
 	message: Message;
+	documents: ConversationDocument[];
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, documents }: MessageBubbleProps) {
 	if (message.role === "system") {
 		return (
 			<motion.div
@@ -23,43 +27,74 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 	}
 
 	if (message.role === "user") {
+		const attachedDocs =
+			message.document_ids && message.document_ids.length > 0
+				? message.document_ids
+						.map((id) => documents.find((d) => d.id === id))
+						.filter(Boolean)
+				: [];
+
 		return (
 			<motion.div
-				initial={{ opacity: 0, y: 8 }}
+				initial={{ opacity: 0, y: 6 }}
 				animate={{ opacity: 1, y: 0 }}
-				transition={{ duration: 0.2 }}
-				className="flex justify-end py-1.5"
+				transition={{ duration: 0.18, ease: "easeOut" }}
+				className="group flex items-end justify-end gap-1.5 py-1.5"
 			>
-				<div className="max-w-[75%] rounded-2xl rounded-br-md bg-neutral-100 px-4 py-2.5">
-					<p className="whitespace-pre-wrap text-sm text-neutral-800">
-						{message.content}
-					</p>
+				<div className="opacity-0 transition-opacity group-hover:opacity-100">
+					<CopyButton text={message.content} />
+				</div>
+				<div className="flex max-w-[75%] flex-col items-end gap-1.5">
+					{attachedDocs.length > 0 && (
+						<div className="flex flex-col items-end gap-1">
+							{attachedDocs.map((d) => (
+								<span
+									key={d!.id}
+									className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-0.5 text-xs text-neutral-600"
+									title={d!.filename}
+								>
+									<FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
+									<span className="truncate">{d!.filename}</span>
+								</span>
+							))}
+						</div>
+					)}
+					<div className="rounded-2xl rounded-br-md bg-neutral-100 px-4 py-2.5">
+						<p className="whitespace-pre-wrap text-sm text-neutral-800">
+							{message.content}
+						</p>
+					</div>
 				</div>
 			</motion.div>
 		);
 	}
 
-	// Assistant message
+	const cited = citedDocuments(message.content, documents);
+
 	return (
 		<motion.div
-			initial={{ opacity: 0, y: 8 }}
+			initial={{ opacity: 0, y: 6 }}
 			animate={{ opacity: 1, y: 0 }}
-			transition={{ duration: 0.2 }}
-			className="flex gap-3 py-1.5"
+			transition={{ duration: 0.18, ease: "easeOut" }}
+			className="py-2"
 		>
-			<div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900">
-				<Bot className="h-4 w-4 text-white" />
-			</div>
-			<div className="min-w-0 max-w-[80%]">
-				<div className="prose">
-					<Streamdown>{message.content}</Streamdown>
-				</div>
-				{message.sources_cited > 0 && (
-					<p className="mt-1.5 text-xs text-neutral-400">
-						{message.sources_cited} source
-						{message.sources_cited !== 1 ? "s" : ""} cited
-					</p>
+			<div className="min-w-0">
+				<SmoothMarkdown content={message.content} documents={documents} />
+				{cited.length > 0 && (
+					<div className="mt-3 flex flex-wrap gap-1.5">
+						{cited.map((d) => (
+							<FileChip
+								key={d.id}
+								id={d.id}
+								filename={d.filename}
+								variant="block"
+							/>
+						))}
+					</div>
 				)}
+				<div className="mt-2 flex items-center gap-1">
+					<CopyButton text={message.content} />
+				</div>
 			</div>
 		</motion.div>
 	);
@@ -67,33 +102,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
 interface StreamingBubbleProps {
 	content: string;
+	documents: ConversationDocument[];
 }
 
-export function StreamingBubble({ content }: StreamingBubbleProps) {
+export function StreamingBubble({ content, documents }: StreamingBubbleProps) {
 	return (
-		<div className="flex gap-3 py-1.5">
-			<div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900">
-				<Bot className="h-4 w-4 text-white" />
-			</div>
-			<div className="min-w-0 max-w-[80%]">
+		<div className="py-2">
+			<div className="min-w-0">
 				{content ? (
-					<div className="prose">
-						<Streamdown mode="streaming">{content}</Streamdown>
-					</div>
+					<SmoothMarkdown content={content} documents={documents} streaming />
 				) : (
-					<div className="flex items-center gap-1 py-2">
-						<span className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400" />
-						<span
-							className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400"
-							style={{ animationDelay: "0.15s" }}
-						/>
-						<span
-							className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400"
-							style={{ animationDelay: "0.3s" }}
-						/>
-					</div>
+					<ThinkingIndicator />
 				)}
-				<span className="inline-block h-4 w-0.5 animate-pulse bg-neutral-400" />
 			</div>
 		</div>
 	);

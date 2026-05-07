@@ -54,6 +54,7 @@ export function useMessages(conversationId: string | null) {
 				role: "user",
 				content,
 				sources_cited: 0,
+				document_ids: documentIds ?? null,
 				created_at: new Date().toISOString(),
 			};
 

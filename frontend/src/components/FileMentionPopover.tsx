@@ -24,7 +24,7 @@ export function FileMentionPopover({
 		);
 
 	return (
-		<div className="absolute bottom-full left-0 z-30 mb-1 w-72 rounded-button border border-neutral-200 bg-white p-1 shadow-lg">
+		<div className="absolute bottom-full left-0 z-30 mb-1 w-72 max-w-[calc(100vw-1.5rem)] rounded-button border border-neutral-200 bg-white p-1 shadow-lg">
 			{candidates.length === 0 ? (
 				<p className="px-3 py-2 text-xs text-neutral-400">
 					{documents.length === 0

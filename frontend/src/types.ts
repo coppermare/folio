@@ -12,6 +12,7 @@ export interface Message {
 	role: "user" | "assistant" | "system";
 	content: string;
 	sources_cited: number;
+	document_ids?: string[] | null;
 	created_at: string;
 }
 

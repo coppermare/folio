@@ -2,6 +2,7 @@ import { ArrowUp, Plus } from "lucide-react";
 import {
 	type ChangeEvent,
 	type ClipboardEvent,
+	type DragEvent,
 	type KeyboardEvent,
 	useCallback,
 	useEffect,
@@ -49,8 +50,12 @@ export function ChatInput({
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const dragCounter = useRef(0);
+	const [isDragging, setIsDragging] = useState(false);
 
 	const totalAttachments = pendingFiles.length + references.length;
+	const dropDisabled =
+		disabled || totalAttachments >= MAX_ATTACHMENTS_PER_MESSAGE;
 
 	// Listen for "Reference in chat" actions from FileRow.
 	useEffect(() => {
@@ -145,6 +150,52 @@ export function ChatInput({
 			}
 		},
 		[addReference, addPendingFiles],
+	);
+
+	const hasFiles = (e: DragEvent<HTMLDivElement>) =>
+		Array.from(e.dataTransfer.types ?? []).includes("Files");
+
+	const handleDragEnter = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!hasFiles(e)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			dragCounter.current += 1;
+			if (!dropDisabled) setIsDragging(true);
+		},
+		[dropDisabled],
+	);
+
+	const handleDragOver = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!hasFiles(e)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			e.dataTransfer.dropEffect = dropDisabled ? "none" : "copy";
+		},
+		[dropDisabled],
+	);
+
+	const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+		if (!hasFiles(e)) return;
+		e.preventDefault();
+		e.stopPropagation();
+		dragCounter.current = Math.max(0, dragCounter.current - 1);
+		if (dragCounter.current === 0) setIsDragging(false);
+	}, []);
+
+	const handleDrop = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!hasFiles(e)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			dragCounter.current = 0;
+			setIsDragging(false);
+			if (dropDisabled) return;
+			const files = Array.from(e.dataTransfer.files ?? []);
+			if (files.length > 0) addPendingFiles(files);
+		},
+		[dropDisabled, addPendingFiles],
 	);
 
 	const handleSendRef = useRef<() => Promise<void>>(async () => {});
@@ -250,9 +301,22 @@ export function ChatInput({
 			references.length > 0);
 
 	return (
-		<div className="px-6 pb-4">
-			<div className="relative mx-auto max-w-2xl">
-				<div className="rounded-3xl border border-neutral-200 bg-white shadow-md">
+		<div className="px-3 pb-3 md:px-6 md:pb-4">
+			<div
+				className="relative mx-auto max-w-2xl"
+				onDragEnter={handleDragEnter}
+				onDragOver={handleDragOver}
+				onDragLeave={handleDragLeave}
+				onDrop={handleDrop}
+			>
+				<div className="relative rounded-3xl border border-neutral-200 bg-white shadow-md">
+					{isDragging && (
+						<div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-neutral-400 bg-white/90">
+							<span className="text-sm font-medium text-neutral-600">
+								Drop PDFs to attach
+							</span>
+						</div>
+					)}
 					<ChatAttachments
 						pendingFiles={pendingFiles}
 						references={references}

@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Files, Loader2, Menu } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import * as api from "../lib/api";
 import type { Conversation, ConversationDocument, Message } from "../types";
@@ -6,6 +6,48 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble, StreamingBubble } from "./MessageBubble";
+import { Button } from "./ui/button";
+
+function MobileEmptyHeader({
+	onOpenSidebar,
+	onOpenWorkspace,
+	documentsCount,
+}: {
+	onOpenSidebar?: () => void;
+	onOpenWorkspace?: () => void;
+	documentsCount: number;
+}) {
+	return (
+		<div className="flex h-10 flex-shrink-0 items-center gap-2 bg-gradient-to-b from-white to-transparent px-3 md:hidden">
+			<Button
+				variant="ghost"
+				size="icon"
+				className="h-8 w-8 flex-shrink-0"
+				onClick={onOpenSidebar}
+				aria-label="Open conversations"
+			>
+				<Menu className="h-4 w-4 text-neutral-600" />
+			</Button>
+			<span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800">
+				Folio
+			</span>
+			<Button
+				variant="ghost"
+				size="icon"
+				className="relative h-8 w-8 flex-shrink-0"
+				onClick={onOpenWorkspace}
+				aria-label="Open workspace"
+			>
+				<Files className="h-4 w-4 text-neutral-600" />
+				{documentsCount > 0 && (
+					<span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-900 px-1 text-[10px] font-medium text-white">
+						{documentsCount}
+					</span>
+				)}
+			</Button>
+		</div>
+	);
+}
 
 interface ChatWindowProps {
 	messages: Message[];
@@ -26,6 +68,10 @@ interface ChatWindowProps {
 	onUpload: (files: File[]) => Promise<{ id: string; filename: string }[]>;
 	onRename: (id: string, title: string) => Promise<void>;
 	onDelete: (id: string) => Promise<void> | void;
+	isMobile?: boolean;
+	documentsCount?: number;
+	onOpenSidebar?: () => void;
+	onOpenWorkspace?: () => void;
 }
 
 export function ChatWindow({
@@ -43,6 +89,10 @@ export function ChatWindow({
 	onUpload,
 	onRename,
 	onDelete,
+	isMobile = false,
+	documentsCount = 0,
+	onOpenSidebar,
+	onOpenWorkspace,
 }: ChatWindowProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -92,13 +142,23 @@ export function ChatWindow({
 
 	return (
 		<div className="flex min-w-0 flex-1 flex-col bg-white">
-			{conversation && (
+			{conversation ? (
 				<ChatHeader
 					conversation={conversation}
 					onRename={onRename}
 					onDelete={onDelete}
+					isMobile={isMobile}
+					documentsCount={documentsCount}
+					onOpenSidebar={onOpenSidebar}
+					onOpenWorkspace={onOpenWorkspace}
 				/>
-			)}
+			) : isMobile ? (
+				<MobileEmptyHeader
+					onOpenSidebar={onOpenSidebar}
+					onOpenWorkspace={onOpenWorkspace}
+					documentsCount={documentsCount}
+				/>
+			) : null}
 
 			{loading ? (
 				<div className="flex flex-1 items-center justify-center">
@@ -115,12 +175,24 @@ export function ChatWindow({
 							{error}
 						</div>
 					)}
-					<div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-4">
+					<div
+						ref={scrollRef}
+						className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-4"
+					>
 						<div className="mx-auto max-w-2xl space-y-1">
 							{messages.map((message) => (
-								<MessageBubble key={message.id} message={message} />
+								<MessageBubble
+									key={message.id}
+									message={message}
+									documents={documents}
+								/>
 							))}
-							{streaming && <StreamingBubble content={streamingContent} />}
+							{streaming && (
+								<StreamingBubble
+									content={streamingContent}
+									documents={documents}
+								/>
+							)}
 						</div>
 					</div>
 				</>

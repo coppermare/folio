@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { ChevronDown, Files, Menu } from "lucide-react";
 import {
 	type KeyboardEvent,
 	useCallback,
@@ -26,12 +26,20 @@ interface ChatHeaderProps {
 	conversation: Conversation;
 	onRename: (id: string, title: string) => Promise<void>;
 	onDelete: (id: string) => Promise<void> | void;
+	isMobile?: boolean;
+	documentsCount?: number;
+	onOpenSidebar?: () => void;
+	onOpenWorkspace?: () => void;
 }
 
 export function ChatHeader({
 	conversation,
 	onRename,
 	onDelete,
+	isMobile = false,
+	documentsCount = 0,
+	onOpenSidebar,
+	onOpenWorkspace,
 }: ChatHeaderProps) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(conversation.title);
@@ -79,8 +87,19 @@ export function ChatHeader({
 	);
 
 	return (
-		<div className="flex h-10 flex-shrink-0 items-center justify-between bg-gradient-to-b from-white to-transparent px-6">
-			<div className="min-w-0 flex-1">
+		<div className="flex h-10 flex-shrink-0 items-center justify-between gap-2 bg-gradient-to-b from-white to-transparent px-3 md:px-6">
+			{isMobile && (
+				<Button
+					variant="ghost"
+					size="icon"
+					className="h-8 w-8 flex-shrink-0 md:hidden"
+					onClick={onOpenSidebar}
+					aria-label="Open conversations"
+				>
+					<Menu className="h-4 w-4 text-neutral-600" />
+				</Button>
+			)}
+			<div className="min-w-0 md:flex-1">
 				{editing ? (
 					<input
 						ref={inputRef}
@@ -91,7 +110,7 @@ export function ChatHeader({
 						className="w-full max-w-md rounded border border-neutral-200 bg-white px-2 py-1 text-sm font-semibold text-neutral-800 outline-none focus:border-neutral-400"
 					/>
 				) : (
-					<h2 className="truncate text-sm font-semibold text-neutral-800">
+					<h2 className="max-w-[140px] truncate text-sm font-semibold text-neutral-800 md:max-w-none">
 						{conversation.title}
 					</h2>
 				)}
@@ -105,7 +124,7 @@ export function ChatHeader({
 						className="h-8 w-8 flex-shrink-0"
 						aria-label="Conversation options"
 					>
-						<MoreHorizontal className="h-4 w-4 text-neutral-500" />
+						<ChevronDown className="h-4 w-4 text-neutral-500" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">
@@ -121,6 +140,25 @@ export function ChatHeader({
 				</DropdownMenuContent>
 			</DropdownMenu>
 
+			{isMobile && <div className="flex-1 md:hidden" />}
+
+			{isMobile && (
+				<Button
+					variant="ghost"
+					size="icon"
+					className="relative h-8 w-8 flex-shrink-0 md:hidden"
+					onClick={onOpenWorkspace}
+					aria-label="Open workspace"
+				>
+					<Files className="h-4 w-4 text-neutral-600" />
+					{documentsCount > 0 && (
+						<span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-900 px-1 text-[10px] font-medium text-white">
+							{documentsCount}
+						</span>
+					)}
+				</Button>
+			)}
+
 			<Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
 				<DialogContent className="sm:max-w-md">
 					<DialogHeader>
@@ -131,10 +169,7 @@ export function ChatHeader({
 						</DialogDescription>
 					</DialogHeader>
 					<div className="flex justify-end gap-2">
-						<Button
-							variant="ghost"
-							onClick={() => setConfirmOpen(false)}
-						>
+						<Button variant="ghost" onClick={() => setConfirmOpen(false)}>
 							Cancel
 						</Button>
 						<Button

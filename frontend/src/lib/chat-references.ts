@@ -37,3 +37,17 @@ export function decodeFileRef(raw: string): FileRefPayload | null {
 	}
 	return null;
 }
+
+// Pub/sub for opening a document in the workspace panel from anywhere
+// (e.g. an inline file chip inside an AI response).
+type OpenListener = (id: string) => void;
+const openListeners = new Set<OpenListener>();
+
+export function onOpenDocument(listener: OpenListener): () => void {
+	openListeners.add(listener);
+	return () => openListeners.delete(listener);
+}
+
+export function emitOpenDocument(id: string) {
+	for (const l of openListeners) l(id);
+}

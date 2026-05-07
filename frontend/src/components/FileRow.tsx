@@ -1,4 +1,4 @@
-import { FileText, MoreHorizontal } from "lucide-react";
+import { ChevronDown, FileText } from "lucide-react";
 import { useState } from "react";
 import {
 	FILE_REF_MIME,
@@ -6,6 +6,7 @@ import {
 	encodeFileRef,
 } from "../lib/chat-references";
 import type { ConversationDocument } from "../types";
+import { Button } from "./ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -85,13 +86,14 @@ export function FileRow({
 
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<button
-						type="button"
-						className="flex h-7 w-7 items-center justify-center rounded text-neutral-400 opacity-0 transition-opacity hover:bg-neutral-200 hover:text-neutral-700 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+					<Button
+						variant="ghost"
+						size="iconSm"
+						className="text-neutral-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
 						aria-label="File actions"
 					>
-						<MoreHorizontal className="h-4 w-4" />
-					</button>
+						<ChevronDown className="h-4 w-4" />
+					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="min-w-[12rem]">
 					<DropdownMenuItem onSelect={() => onOpen(document.id)}>

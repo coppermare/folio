@@ -36,6 +36,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     sources_cited: int
+    document_ids: list[str] | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -80,6 +81,7 @@ async def list_messages(
             role=m.role,
             content=m.content,
             sources_cited=m.sources_cited,
+            document_ids=m.document_ids,
             created_at=m.created_at,
         )
         for m in messages
@@ -103,6 +105,7 @@ async def send_message(
         conversation_id=conversation_id,
         role="user",
         content=body.content,
+        document_ids=body.document_ids or None,
     )
     session.add(user_message)
     await session.commit()
