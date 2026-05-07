@@ -52,7 +52,7 @@ export function buildCotSteps({
 		id: "scan",
 		label:
 			documents.length === 1
-				? `Scanning ${documents[0].filename}`
+				? `Scanning ${documents[0]!.filename}`
 				: `Scanning ${documents.length} documents`,
 		status: content.length === 0 && streaming ? "active" : "done",
 	});
@@ -62,7 +62,7 @@ export function buildCotSteps({
 			id: "locate",
 			label:
 				cited.length === 1
-					? `Reading ${cited[0].filename}`
+					? `Reading ${cited[0]!.filename}`
 					: `Cross-referencing ${cited.length} documents`,
 			status: streaming ? "active" : "done",
 		});
@@ -88,8 +88,8 @@ export function buildCotSteps({
 	// Only one step should be "active" at a time — the latest one.
 	let activeFound = false;
 	for (let i = steps.length - 1; i >= 0; i--) {
-		if (steps[i].status === "active") {
-			if (activeFound) steps[i].status = "done";
+		if (steps[i]!.status === "active") {
+			if (activeFound) steps[i]!.status = "done";
 			else activeFound = true;
 		}
 	}

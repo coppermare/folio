@@ -261,7 +261,7 @@ export function ChatInput({
 		[addReference],
 	);
 
-	const handleSend = useCallback(() => {
+	const handleSend = useCallback(async () => {
 		const trimmed = value.trim();
 		if (disabled) return;
 		if (!trimmed && pendingFiles.length === 0 && references.length === 0) {

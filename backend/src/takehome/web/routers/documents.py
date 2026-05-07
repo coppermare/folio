@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
@@ -14,6 +14,7 @@ from takehome.services.conversation import get_conversation
 from takehome.services.document import (
     delete_document,
     get_document,
+    list_documents_for_conversation,
     upload_document,
 )
 
@@ -33,6 +34,7 @@ class DocumentOut(BaseModel):
     filename: str
     page_count: int
     uploaded_at: datetime
+    extraction_failed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -42,41 +44,73 @@ class DocumentOut(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
+def _to_out(doc) -> DocumentOut:
+    return DocumentOut(
+        id=doc.id,
+        conversation_id=doc.conversation_id,
+        filename=doc.filename,
+        page_count=doc.page_count,
+        uploaded_at=doc.uploaded_at,
+        extraction_failed=doc.extracted_text is None,
+    )
+
+
 @router.post(
     "/api/conversations/{conversation_id}/documents",
     response_model=DocumentOut,
-    status_code=201,
 )
 async def upload_document_endpoint(
     conversation_id: str,
     file: UploadFile,
+    response: Response,
     session: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
-    """Upload a PDF document for a conversation. Multiple documents per conversation are supported."""
-    # Verify the conversation exists
+    """Upload a PDF document for a conversation.
+
+    Multiple documents per conversation are supported. If the same file
+    (by SHA-256 hash) already exists in this conversation, returns the
+    existing record with status 200 and ``X-Duplicate-Upload: true`` so the
+    client can show "Already added" instead of treating it as new.
+    """
     conversation = await get_conversation(session, conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     try:
-        document = await upload_document(session, conversation_id, file)
+        result = await upload_document(session, conversation_id, file)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    logger.info(
-        "Document uploaded",
-        conversation_id=conversation_id,
-        document_id=document.id,
-        filename=document.filename,
-    )
+    if result.duplicate:
+        response.status_code = 200
+        response.headers["X-Duplicate-Upload"] = "true"
+    else:
+        response.status_code = 201
+        logger.info(
+            "Document uploaded",
+            conversation_id=conversation_id,
+            document_id=result.document.id,
+            filename=result.document.filename,
+        )
 
-    return DocumentOut(
-        id=document.id,
-        conversation_id=document.conversation_id,
-        filename=document.filename,
-        page_count=document.page_count,
-        uploaded_at=document.uploaded_at,
-    )
+    return _to_out(result.document)
+
+
+@router.get(
+    "/api/conversations/{conversation_id}/documents",
+    response_model=list[DocumentOut],
+)
+async def list_documents_endpoint(
+    conversation_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentOut]:
+    """List all documents in a conversation, oldest first."""
+    conversation = await get_conversation(session, conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    documents = await list_documents_for_conversation(session, conversation_id)
+    return [_to_out(d) for d in documents]
 
 
 @router.get("/api/documents/{document_id}/content")

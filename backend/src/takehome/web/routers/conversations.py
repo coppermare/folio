@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from takehome.db.models import Conversation
 from takehome.db.session import get_session
 from takehome.services.conversation import (
     create_conversation,
@@ -29,6 +28,7 @@ class DocumentInfo(BaseModel):
     filename: str
     page_count: int
     uploaded_at: datetime
+    extraction_failed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -53,10 +53,6 @@ class ConversationDetail(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ConversationCreate(BaseModel):
-    pass
-
-
 class ConversationUpdate(BaseModel):
     title: str
 
@@ -66,22 +62,24 @@ class ConversationUpdate(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-def _detail_for(conversation: Conversation) -> ConversationDetail:
+def _doc_info(doc) -> DocumentInfo:
+    return DocumentInfo(
+        id=doc.id,
+        filename=doc.filename,
+        page_count=doc.page_count,
+        uploaded_at=doc.uploaded_at,
+        extraction_failed=doc.extracted_text is None,
+    )
+
+
+def _detail(conversation) -> ConversationDetail:
     docs = sorted(conversation.documents, key=lambda d: d.uploaded_at)
     return ConversationDetail(
         id=conversation.id,
         title=conversation.title,
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
-        documents=[
-            DocumentInfo(
-                id=d.id,
-                filename=d.filename,
-                page_count=d.page_count,
-                uploaded_at=d.uploaded_at,
-            )
-            for d in docs
-        ],
+        documents=[_doc_info(d) for d in docs],
     )
 
 
@@ -94,7 +92,6 @@ def _detail_for(conversation: Conversation) -> ConversationDetail:
 async def list_conversations_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationListItem]:
-    """List all conversations, ordered by most recently updated."""
     conversations = await list_conversations(session)
     return [
         ConversationListItem(
@@ -112,7 +109,6 @@ async def list_conversations_endpoint(
 async def create_conversation_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Create a new conversation."""
     conversation = await create_conversation(session)
     return ConversationDetail(
         id=conversation.id,
@@ -128,11 +124,10 @@ async def get_conversation_endpoint(
     conversation_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Get a single conversation with all its documents."""
     conversation = await get_conversation(session, conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    return _detail_for(conversation)
+    return _detail(conversation)
 
 
 @router.patch("/{conversation_id}", response_model=ConversationDetail)
@@ -141,11 +136,10 @@ async def update_conversation_endpoint(
     body: ConversationUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> ConversationDetail:
-    """Update a conversation's title."""
     conversation = await update_conversation(session, conversation_id, body.title)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    return _detail_for(conversation)
+    return _detail(conversation)
 
 
 @router.delete("/{conversation_id}", status_code=204)
@@ -153,7 +147,6 @@ async def delete_conversation_endpoint(
     conversation_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    """Delete a conversation and all associated data."""
     deleted = await delete_conversation(session, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Conversation not found")

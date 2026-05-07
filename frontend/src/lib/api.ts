@@ -100,17 +100,33 @@ export async function sendMessage(
 	return res;
 }
 
+export interface UploadResult {
+	document: Document;
+	duplicate: boolean;
+}
+
 export async function uploadDocument(
 	conversationId: string,
 	file: File,
-): Promise<Document> {
+): Promise<UploadResult> {
 	const formData = new FormData();
 	formData.append("file", file);
 	const res = await fetch(`${BASE}/conversations/${conversationId}/documents`, {
 		method: "POST",
 		body: formData,
 	});
-	return handleResponse<Document>(res);
+	const document = await handleResponse<Document>(res);
+	const duplicate = res.headers.get("x-duplicate-upload") === "true";
+	return { document, duplicate };
+}
+
+export async function fetchDocuments(
+	conversationId: string,
+): Promise<Document[]> {
+	const res = await fetch(
+		`${BASE}/conversations/${conversationId}/documents`,
+	);
+	return handleResponse<Document[]>(res);
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {

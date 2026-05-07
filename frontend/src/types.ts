@@ -6,12 +6,18 @@ export interface Conversation {
 	document_count: number;
 }
 
+export interface Citation {
+	document_id: string;
+	label: string;
+}
+
 export interface Message {
 	id: string;
 	conversation_id: string;
 	role: "user" | "assistant" | "system";
 	content: string;
 	sources_cited: number;
+	sources?: Citation[] | null;
 	document_ids?: string[] | null;
 	created_at: string;
 }
@@ -22,6 +28,7 @@ export interface Document {
 	filename: string;
 	page_count: number;
 	uploaded_at: string;
+	extraction_failed: boolean;
 }
 
 export interface ConversationDocument {
@@ -29,6 +36,7 @@ export interface ConversationDocument {
 	filename: string;
 	page_count: number;
 	uploaded_at: string;
+	extraction_failed?: boolean;
 }
 
 export interface ConversationDetail {

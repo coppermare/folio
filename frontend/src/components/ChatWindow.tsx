@@ -125,7 +125,7 @@ export function ChatWindow({
 					const results = await Promise.all(
 						attachments.pending.map((f) => api.uploadDocument(cid, f)),
 					);
-					uploadedIds = results.map((r) => r.id);
+					uploadedIds = results.map((r) => r.document.id);
 				}
 			}
 			const documentIds = [...attachments.referenceIds, ...uploadedIds];

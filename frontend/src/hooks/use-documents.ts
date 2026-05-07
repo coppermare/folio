@@ -31,14 +31,20 @@ export function useDocuments(conversationId: string | null) {
 			try {
 				setUploading(true);
 				setError(null);
-				const doc = await api.uploadDocument(conversationId, file);
+				const result = await api.uploadDocument(conversationId, file);
+				const doc = result.document;
 				const summary: ConversationDocument = {
 					id: doc.id,
 					filename: doc.filename,
 					page_count: doc.page_count,
 					uploaded_at: doc.uploaded_at,
+					extraction_failed: doc.extraction_failed,
 				};
-				setDocuments((prev) => [...prev, summary]);
+				setDocuments((prev) =>
+					result.duplicate || prev.some((d) => d.id === summary.id)
+						? prev
+						: [...prev, summary],
+				);
 				return summary;
 			} catch (err) {
 				setError(
