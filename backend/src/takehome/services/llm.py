@@ -9,7 +9,6 @@ from pydantic_ai import Agent
 
 from takehome.config import settings  # noqa: F401 — triggers ANTHROPIC_API_KEY export
 
-
 # --------------------------------------------------------------------------- #
 # Typed output contract (foundation for K-117 grounded citations)
 # --------------------------------------------------------------------------- #
@@ -62,7 +61,14 @@ SYSTEM_PROMPT = (
     "- Where helpful, also reference the section, clause, or page in prose "
     "  (e.g. \"Section 4.2\", \"Page 12\").\n"
     "- If the answer is not in any document, say so clearly. Do not fabricate.\n"
-    "- Be concise and precise. Lawyers value accuracy over verbosity."
+    "- Be concise and precise. Lawyers value accuracy over verbosity.\n\n"
+    "FORMATTING RULES (strict):\n"
+    "- Write in short, well-spaced paragraphs and bullet lists. Default to flowing prose; use bullets only when listing distinct items.\n"
+    "- Use Markdown for emphasis (**bold**, *italic*) and short headings (## or ###) when sections truly help.\n"
+    "- DO NOT use Markdown tables or any pipe-delimited (`|`) formatting. Never produce rows like `| col | col |`.\n"
+    "- DO NOT use ASCII art, separators (---, ===), or decorative characters.\n"
+    "- DO NOT prefix bullets with extra symbols beyond a single `-` or `•`.\n"
+    "- Keep lines reasonably short and avoid trailing whitespace."
 )
 
 agent = Agent("anthropic:claude-haiku-4-5-20251001", system_prompt=SYSTEM_PROMPT)

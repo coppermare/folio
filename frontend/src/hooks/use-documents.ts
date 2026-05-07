@@ -1,32 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../lib/api";
-import type { Document } from "../types";
-
-export interface UploadOutcome {
-	document: Document;
-	duplicate: boolean;
-}
+import type { ConversationDocument } from "../types";
 
 export function useDocuments(conversationId: string | null) {
-	const [documents, setDocuments] = useState<Document[]>([]);
-	const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
-	const [uploadingCount, setUploadingCount] = useState(0);
+	const [documents, setDocuments] = useState<ConversationDocument[]>([]);
+	const [uploading, setUploading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const refresh = useCallback(async () => {
 		if (!conversationId) {
 			setDocuments([]);
-			setActiveDocumentId(null);
 			return;
 		}
 		try {
 			setError(null);
-			const docs = await api.fetchDocuments(conversationId);
-			setDocuments(docs);
-			setActiveDocumentId((current) => {
-				if (current && docs.some((d) => d.id === current)) return current;
-				return docs.length > 0 ? docs[0].id : null;
-			});
+			const detail = await api.fetchConversation(conversationId);
+			setDocuments(detail.documents);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load documents");
 		}
@@ -37,42 +26,64 @@ export function useDocuments(conversationId: string | null) {
 	}, [refresh]);
 
 	const upload = useCallback(
-		async (file: File): Promise<UploadOutcome | null> => {
+		async (file: File): Promise<ConversationDocument | null> => {
 			if (!conversationId) return null;
 			try {
-				setUploadingCount((c) => c + 1);
+				setUploading(true);
 				setError(null);
 				const result = await api.uploadDocument(conversationId, file);
-				setDocuments((prev) => {
-					if (prev.some((d) => d.id === result.document.id)) return prev;
-					return [...prev, result.document];
-				});
-				setActiveDocumentId((current) => current ?? result.document.id);
-				return result;
+				const doc = result.document;
+				const summary: ConversationDocument = {
+					id: doc.id,
+					filename: doc.filename,
+					page_count: doc.page_count,
+					uploaded_at: doc.uploaded_at,
+					extraction_failed: doc.extraction_failed,
+				};
+				setDocuments((prev) =>
+					result.duplicate || prev.some((d) => d.id === summary.id)
+						? prev
+						: [...prev, summary],
+				);
+				return summary;
 			} catch (err) {
 				setError(
 					err instanceof Error ? err.message : "Failed to upload document",
 				);
 				return null;
 			} finally {
-				setUploadingCount((c) => Math.max(0, c - 1));
+				setUploading(false);
 			}
 		},
 		[conversationId],
 	);
 
-	const activeDocument =
-		documents.find((d) => d.id === activeDocumentId) ?? null;
+	const uploadMany = useCallback(
+		async (files: File[]): Promise<ConversationDocument[]> => {
+			const results = await Promise.all(files.map((f) => upload(f)));
+			return results.filter((d): d is ConversationDocument => d !== null);
+		},
+		[upload],
+	);
+
+	const remove = useCallback(async (documentId: string) => {
+		try {
+			await api.deleteDocument(documentId);
+			setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to delete document",
+			);
+		}
+	}, []);
 
 	return {
 		documents,
-		activeDocument,
-		activeDocumentId,
-		setActiveDocumentId,
-		uploading: uploadingCount > 0,
-		uploadingCount,
+		uploading,
 		error,
 		upload,
+		uploadMany,
+		remove,
 		refresh,
 	};
 }

@@ -58,7 +58,7 @@ class ConversationUpdate(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Endpoints
+# Helpers
 # --------------------------------------------------------------------------- #
 
 
@@ -81,6 +81,11 @@ def _detail(conversation) -> ConversationDetail:
         updated_at=conversation.updated_at,
         documents=[_doc_info(d) for d in docs],
     )
+
+
+# --------------------------------------------------------------------------- #
+# Endpoints
+# --------------------------------------------------------------------------- #
 
 
 @router.get("", response_model=list[ConversationListItem])

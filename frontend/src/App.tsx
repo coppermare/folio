@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
-import { DocumentViewer } from "./components/DocumentViewer";
+import { WorkspacePanel } from "./components/WorkspacePanel";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
 import { useDocuments } from "./hooks/use-documents";
+import { useIsMobile } from "./hooks/use-is-mobile";
 import { useMessages } from "./hooks/use-messages";
 
 export default function App() {
 	const {
 		conversations,
+		selected,
 		selectedId,
 		loading: conversationsLoading,
 		create,
 		select,
+		rename,
 		remove,
 		refresh: refreshConversations,
 	} = useConversations();
@@ -29,43 +32,83 @@ export default function App() {
 
 	const {
 		documents,
-		activeDocumentId,
-		setActiveDocumentId,
-		uploadingCount,
-		upload,
+		uploading,
+		uploadMany,
+		remove: removeDocument,
+		refresh: refreshDocuments,
 	} = useDocuments(selectedId);
 
-	const [toast, setToast] = useState<string | null>(null);
+	const isMobile = useIsMobile();
+	const [sidebarOpen, setSidebarOpen] = useState(false);
+	const [workspaceOpen, setWorkspaceOpen] = useState(false);
+
 	useEffect(() => {
-		if (!toast) return;
-		const timer = window.setTimeout(() => setToast(null), 3000);
-		return () => window.clearTimeout(timer);
-	}, [toast]);
+		if (!isMobile) {
+			setSidebarOpen(false);
+			setWorkspaceOpen(false);
+		}
+	}, [isMobile]);
+
+	useEffect(() => {
+		const handler = () => {
+			if (isMobile) setWorkspaceOpen(true);
+		};
+		window.addEventListener("folio:open-workspace", handler);
+		return () => window.removeEventListener("folio:open-workspace", handler);
+	}, [isMobile]);
 
 	const handleSend = useCallback(
-		async (content: string) => {
-			await send(content);
+		async (
+			content: string,
+			documentIds?: string[],
+			overrideConversationId?: string,
+		) => {
+			await send(content, documentIds, overrideConversationId);
 			refreshConversations();
 		},
 		[send, refreshConversations],
 	);
 
 	const handleUpload = useCallback(
-		async (file: File) => {
-			const outcome = await upload(file);
-			if (!outcome) return;
-			if (outcome.duplicate) {
-				setToast(`"${outcome.document.filename}" is already in this conversation`);
-			} else {
+		async (files: File[]) => {
+			const uploaded = await uploadMany(files);
+			if (uploaded.length > 0) {
 				refreshConversations();
 			}
+			return uploaded;
 		},
-		[upload, refreshConversations],
+		[uploadMany, refreshConversations],
+	);
+
+	const handleRemoveDocument = useCallback(
+		async (id: string) => {
+			await removeDocument(id);
+			refreshConversations();
+		},
+		[removeDocument, refreshConversations],
 	);
 
 	const handleCreate = useCallback(async () => {
 		await create();
-	}, [create]);
+		if (isMobile) setSidebarOpen(false);
+	}, [create, isMobile]);
+
+	const handleSelect = useCallback(
+		(id: string) => {
+			select(id);
+			if (isMobile) setSidebarOpen(false);
+		},
+		[select, isMobile],
+	);
+
+	const ensureConversation = useCallback(async () => {
+		if (selectedId) return selectedId;
+		const created = await create();
+		if (created) {
+			refreshDocuments();
+		}
+		return created?.id ?? null;
+	}, [create, selectedId, refreshDocuments]);
 
 	return (
 		<TooltipProvider delayDuration={200}>
@@ -74,9 +117,13 @@ export default function App() {
 					conversations={conversations}
 					selectedId={selectedId}
 					loading={conversationsLoading}
-					onSelect={select}
+					onSelect={handleSelect}
 					onCreate={handleCreate}
+					onRename={rename}
 					onDelete={remove}
+					isMobile={isMobile}
+					mobileOpen={sidebarOpen}
+					onMobileClose={() => setSidebarOpen(false)}
 				/>
 
 				<ChatWindow
@@ -85,26 +132,31 @@ export default function App() {
 					error={messagesError}
 					streaming={streaming}
 					streamingContent={streamingContent}
-					documents={documents}
-					activeDocumentId={activeDocumentId}
-					uploadingCount={uploadingCount}
+					hasDocuments={documents.length > 0}
 					conversationId={selectedId}
+					conversation={selected}
+					documents={documents}
+					ensureConversation={ensureConversation}
 					onSend={handleSend}
 					onUpload={handleUpload}
-					onSelectDocument={setActiveDocumentId}
+					onRename={rename}
+					onDelete={remove}
+					isMobile={isMobile}
+					documentsCount={documents.length}
+					onOpenSidebar={() => setSidebarOpen(true)}
+					onOpenWorkspace={() => setWorkspaceOpen(true)}
 				/>
 
-				<DocumentViewer
+				<WorkspacePanel
+					conversationId={selectedId}
 					documents={documents}
-					activeDocumentId={activeDocumentId}
-					onSelect={setActiveDocumentId}
+					uploading={uploading}
+					onUpload={handleUpload}
+					onRemove={handleRemoveDocument}
+					isMobile={isMobile}
+					mobileOpen={workspaceOpen}
+					onMobileClose={() => setWorkspaceOpen(false)}
 				/>
-
-				{toast && (
-					<div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
-						{toast}
-					</div>
-				)}
 			</div>
 		</TooltipProvider>
 	);

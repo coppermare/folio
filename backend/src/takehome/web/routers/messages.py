@@ -15,7 +15,10 @@ from starlette.responses import StreamingResponse
 from takehome.db.models import Message
 from takehome.db.session import get_session
 from takehome.services.conversation import get_conversation, update_conversation
-from takehome.services.document import list_documents_for_conversation
+from takehome.services.document import (
+    get_documents_by_ids,
+    list_documents_for_conversation,
+)
 from takehome.services.llm import (
     DocumentContext,
     chat_with_documents,
@@ -40,7 +43,8 @@ class MessageOut(BaseModel):
     role: str
     content: str
     sources_cited: int
-    sources: list[dict[str, Any]] | None
+    sources: list[dict[str, Any]] | None = None
+    document_ids: list[str] | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -48,6 +52,7 @@ class MessageOut(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    document_ids: list[str] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -83,6 +88,7 @@ async def list_messages(
             content=m.content,
             sources_cited=m.sources_cited,
             sources=m.sources,
+            document_ids=m.document_ids,
             created_at=m.created_at,
         )
         for m in messages
@@ -104,6 +110,7 @@ async def send_message(
         conversation_id=conversation_id,
         role="user",
         content=body.content,
+        document_ids=body.document_ids or None,
     )
     session.add(user_message)
     await session.commit()
@@ -113,7 +120,11 @@ async def send_message(
         "User message saved", conversation_id=conversation_id, message_id=user_message.id
     )
 
-    documents = await list_documents_for_conversation(session, conversation_id)
+    if body.document_ids:
+        documents = await get_documents_by_ids(session, body.document_ids)
+    else:
+        documents = await list_documents_for_conversation(session, conversation_id)
+
     doc_contexts = [
         DocumentContext(id=d.id, filename=d.filename, text=d.extracted_text)
         for d in documents

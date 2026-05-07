@@ -45,6 +45,24 @@ export function useConversations() {
 		setSelectedId(id);
 	}, []);
 
+	const rename = useCallback(async (id: string, title: string) => {
+		try {
+			setError(null);
+			const updated = await api.updateConversation(id, title);
+			setConversations((prev) =>
+				prev.map((c) =>
+					c.id === id
+						? { ...c, title: updated.title, updated_at: updated.updated_at }
+						: c,
+				),
+			);
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to rename conversation",
+			);
+		}
+	}, []);
+
 	const remove = useCallback(
 		async (id: string) => {
 			try {
@@ -73,6 +91,7 @@ export function useConversations() {
 		error,
 		create,
 		select,
+		rename,
 		remove,
 		refresh,
 	};

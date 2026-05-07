@@ -122,6 +122,7 @@ async def get_document(session: AsyncSession, document_id: str) -> Document | No
 async def list_documents_for_conversation(
     session: AsyncSession, conversation_id: str
 ) -> list[Document]:
+    """List all documents for a conversation, ordered by upload time."""
     stmt = (
         select(Document)
         .where(Document.conversation_id == conversation_id)
@@ -140,3 +141,32 @@ async def _get_by_conversation_and_hash(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_documents_by_ids(
+    session: AsyncSession, document_ids: list[str]
+) -> list[Document]:
+    """Fetch a list of documents by their ids, preserving the input ordering."""
+    if not document_ids:
+        return []
+    stmt = select(Document).where(Document.id.in_(document_ids))
+    result = await session.execute(stmt)
+    docs = list(result.scalars().all())
+    by_id = {d.id: d for d in docs}
+    return [by_id[doc_id] for doc_id in document_ids if doc_id in by_id]
+
+
+async def delete_document(session: AsyncSession, document_id: str) -> bool:
+    """Delete a document and remove its file from disk. Returns True if it existed."""
+    document = await get_document(session, document_id)
+    if document is None:
+        return False
+    file_path = document.file_path
+    await session.delete(document)
+    await session.commit()
+    try:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+    except OSError:
+        logger.exception("Failed to remove file from disk", path=file_path)
+    return True

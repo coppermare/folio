@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -46,6 +46,7 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     sources_cited: Mapped[int] = mapped_column(Integer, default=0)
     sources: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    document_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")

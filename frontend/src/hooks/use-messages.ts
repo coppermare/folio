@@ -37,15 +37,24 @@ export function useMessages(conversationId: string | null) {
 	}, [refresh]);
 
 	const send = useCallback(
-		async (content: string) => {
-			if (!conversationId || streaming) return;
+		async (
+			content: string,
+			documentIds?: string[],
+			overrideConversationId?: string,
+		) => {
+			// Allow callers to pass a freshly-resolved conversation id (e.g. when a
+			// new chat was just created in the same tick) — closure-captured state
+			// may still be null at this point.
+			const cid = overrideConversationId ?? conversationId;
+			if (!cid || streaming) return;
 
 			const userMessage: Message = {
 				id: `temp-${Date.now()}`,
-				conversation_id: conversationId,
+				conversation_id: cid,
 				role: "user",
 				content,
 				sources_cited: 0,
+				document_ids: documentIds ?? null,
 				created_at: new Date().toISOString(),
 			};
 
@@ -55,7 +64,7 @@ export function useMessages(conversationId: string | null) {
 			setError(null);
 
 			try {
-				const response = await api.sendMessage(conversationId, content);
+				const response = await api.sendMessage(cid, content, documentIds);
 
 				if (!response.body) {
 					throw new Error("No response body");
@@ -116,7 +125,7 @@ export function useMessages(conversationId: string | null) {
 				if (accumulated) {
 					const assistantMessage: Message = {
 						id: `stream-${Date.now()}`,
-						conversation_id: conversationId,
+						conversation_id: cid,
 						role: "assistant",
 						content: accumulated,
 						sources_cited: 0,
@@ -126,7 +135,7 @@ export function useMessages(conversationId: string | null) {
 				}
 
 				// Refresh to get server-canonical messages
-				const freshMessages = await api.fetchMessages(conversationId);
+				const freshMessages = await api.fetchMessages(cid);
 				setMessages(freshMessages);
 			} catch (err) {
 				if (err instanceof DOMException && err.name === "AbortError") return;

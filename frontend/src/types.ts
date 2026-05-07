@@ -17,7 +17,8 @@ export interface Message {
 	role: "user" | "assistant" | "system";
 	content: string;
 	sources_cited: number;
-	sources: Citation[] | null;
+	sources?: Citation[] | null;
+	document_ids?: string[] | null;
 	created_at: string;
 }
 
@@ -30,6 +31,18 @@ export interface Document {
 	extraction_failed: boolean;
 }
 
-export interface ConversationDetail extends Conversation {
-	documents: Document[];
+export interface ConversationDocument {
+	id: string;
+	filename: string;
+	page_count: number;
+	uploaded_at: string;
+	extraction_failed?: boolean;
+}
+
+export interface ConversationDetail {
+	id: string;
+	title: string;
+	created_at: string;
+	updated_at: string;
+	documents: ConversationDocument[];
 }
