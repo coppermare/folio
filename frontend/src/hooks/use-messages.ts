@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../lib/api";
-import type { Message } from "../types";
+import type { Citation, ConfidenceState, Message } from "../types";
 
 export function useMessages(conversationId: string | null) {
 	const [messages, setMessages] = useState<Message[]>([]);
@@ -8,6 +8,8 @@ export function useMessages(conversationId: string | null) {
 	const [error, setError] = useState<string | null>(null);
 	const [streaming, setStreaming] = useState(false);
 	const [streamingContent, setStreamingContent] = useState("");
+	const [streamingSources, setStreamingSources] = useState<Citation[]>([]);
+	const [streamingReasoning, setStreamingReasoning] = useState("");
 	const abortRef = useRef<AbortController | null>(null);
 
 	const refresh = useCallback(async () => {
@@ -61,6 +63,7 @@ export function useMessages(conversationId: string | null) {
 			setMessages((prev) => [...prev, userMessage]);
 			setStreaming(true);
 			setStreamingContent("");
+			setStreamingReasoning("");
 			setError(null);
 
 			try {
@@ -74,6 +77,17 @@ export function useMessages(conversationId: string | null) {
 				const decoder = new TextDecoder();
 				let accumulated = "";
 				let buffer = "";
+
+				// Stash for the dedicated `citations` SSE event. Citations may
+				// arrive before OR after the canonical `message` event depending
+				// on server ordering — we apply them whichever way around. A
+				// single shared ref is fine because there's only one in-flight
+				// assistant turn per conversation at a time.
+				const pendingCitationsRef: {
+					sources: Citation[] | null;
+					confidence: ConfidenceState | null;
+					applied: boolean;
+				} = { sources: null, confidence: null, applied: false };
 
 				while (true) {
 					const { done, value } = await reader.read();
@@ -97,18 +111,58 @@ export function useMessages(conversationId: string | null) {
 								content?: string;
 								delta?: string;
 								message?: Message;
+								source?: Citation;
+								sources?: Citation[];
+								confidence?: ConfidenceState;
+								message_id?: string;
 							};
 
-							if (parsed.type === "delta" && parsed.delta) {
+							if (parsed.type === "reasoning" && parsed.delta) {
+								setStreamingReasoning(
+									(prev) => prev + (parsed.delta as string),
+								);
+							} else if (parsed.type === "delta" && parsed.delta) {
 								accumulated += parsed.delta;
 								setStreamingContent(accumulated);
 							} else if (parsed.type === "content" && parsed.content) {
 								accumulated += parsed.content;
 								setStreamingContent(accumulated);
 							} else if (parsed.type === "message" && parsed.message) {
-								// Final message from server
-								setMessages((prev) => [...prev, parsed.message as Message]);
+								// Canonical assistant message. If the dedicated
+								// `citations` event arrived first, merge; otherwise
+								// the message already carries fields server-side.
+								const incoming = { ...parsed.message } as Message;
+								if (pendingCitationsRef.sources != null) {
+									incoming.sources = pendingCitationsRef.sources;
+								}
+								if (pendingCitationsRef.confidence != null) {
+									incoming.confidence = pendingCitationsRef.confidence;
+								}
+								pendingCitationsRef.applied = true;
+								setMessages((prev) => [...prev, incoming]);
 								accumulated = "";
+							} else if (parsed.type === "source_preview" && parsed.source) {
+								setStreamingSources((prev) => [
+									...prev,
+									parsed.source as Citation,
+								]);
+							} else if (parsed.type === "citations") {
+								const sources = parsed.sources ?? [];
+								const confidence = parsed.confidence ?? "ungrounded";
+								if (pendingCitationsRef.applied) {
+									// `message` already swapped in — patch it by id.
+									const targetId = parsed.message_id;
+									setMessages((prev) =>
+										prev.map((m) =>
+											targetId && m.id === targetId
+												? { ...m, sources, confidence }
+												: m,
+										),
+									);
+								} else {
+									pendingCitationsRef.sources = sources;
+									pendingCitationsRef.confidence = confidence;
+								}
 							} else if (parsed.content && !parsed.type) {
 								// Fallback: plain content field
 								accumulated += parsed.content;
@@ -134,15 +188,19 @@ export function useMessages(conversationId: string | null) {
 					setMessages((prev) => [...prev, assistantMessage]);
 				}
 
-				// Refresh to get server-canonical messages
-				const freshMessages = await api.fetchMessages(cid);
-				setMessages(freshMessages);
+				// Intentional: do NOT refetch from the server here. The canonical
+				// `message` SSE event already carries the persisted Message; an
+				// extra `fetchMessages` would force a second re-render of the
+				// just-swapped bubble and violate K-117's "without flicker"
+				// criterion.
 			} catch (err) {
 				if (err instanceof DOMException && err.name === "AbortError") return;
 				setError(err instanceof Error ? err.message : "Failed to send message");
 			} finally {
 				setStreaming(false);
 				setStreamingContent("");
+				setStreamingSources([]);
+				setStreamingReasoning("");
 			}
 		},
 		[conversationId, streaming],
@@ -154,6 +212,8 @@ export function useMessages(conversationId: string | null) {
 		error,
 		streaming,
 		streamingContent,
+		streamingSources,
+		streamingReasoning,
 		send,
 		refresh,
 	};

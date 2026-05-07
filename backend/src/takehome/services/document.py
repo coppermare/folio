@@ -71,9 +71,7 @@ async def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    logger.info(
-        "Saved uploaded PDF", filename=original_filename, path=file_path, size=len(content)
-    )
+    logger.info("Saved uploaded PDF", filename=original_filename, path=file_path, size=len(content))
 
     extracted_text = ""
     page_count = 0
@@ -143,9 +141,7 @@ async def _get_by_conversation_and_hash(
     return result.scalar_one_or_none()
 
 
-async def get_documents_by_ids(
-    session: AsyncSession, document_ids: list[str]
-) -> list[Document]:
+async def get_documents_by_ids(session: AsyncSession, document_ids: list[str]) -> list[Document]:
     """Fetch a list of documents by their ids, preserving the input ordering."""
     if not document_ids:
         return []

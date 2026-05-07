@@ -4,6 +4,7 @@ import { Document as PDFDocument, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { getDocumentUrl } from "../lib/api";
+import { consumePendingJump, onJumpToPage } from "../lib/chat-references";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 	"pdfjs-dist/build/pdf.worker.min.mjs",
@@ -123,6 +124,32 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 		const page = node.querySelector<HTMLDivElement>(`[data-page="${target}"]`);
 		page?.scrollIntoView({ behavior: "smooth", block: "start" });
 	};
+
+	// Inline-citation page jumps. Two paths:
+	// (1) Sticky buffer — citation fired emitJumpToPage *before* this doc was
+	//     mounted; consume-and-clear once numPages is known so the page anchor
+	//     exists. We also watch `pageWidth` because page anchors only render
+	//     after the layout pass completes.
+	// (2) Live subscription — citation fired while we're already mounted on
+	//     the target doc.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: handleJump only depends on containerRef, which is stable
+	useEffect(() => {
+		if (numPages === 0 || pageWidth === 0) return;
+		const pending = consumePendingJump(documentId);
+		if (pending != null) {
+			handleJump(Math.min(Math.max(pending, 1), numPages));
+		}
+	}, [documentId, numPages, pageWidth]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: handleJump only depends on containerRef, which is stable
+	useEffect(() => {
+		const off = onJumpToPage((targetDocId, page) => {
+			if (targetDocId !== documentId) return;
+			if (numPages === 0) return; // sticky buffer will catch it on mount
+			handleJump(Math.min(Math.max(page, 1), numPages));
+		});
+		return off;
+	}, [documentId, numPages]);
 
 	const url = getDocumentUrl(documentId);
 

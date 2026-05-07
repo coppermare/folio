@@ -34,16 +34,16 @@ export function FileChip({ id, filename, variant = "inline" }: FileChipProps) {
 			}}
 			className={
 				isInline
-					? "mx-0.5 inline-flex max-w-full items-center gap-1 rounded-md bg-neutral-100 px-1.5 py-0.5 align-baseline text-[0.85em] font-medium text-neutral-700 no-underline transition-colors hover:bg-neutral-200 active:scale-[0.98]"
-					: "inline-flex max-w-full items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-200 active:scale-[0.98]"
+					? "mx-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 align-baseline text-[0.85em] font-medium text-neutral-700 no-underline transition-colors hover:bg-neutral-200 active:scale-[0.98]"
+					: "inline-flex max-w-full items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-200 active:scale-[0.98]"
 			}
 			title={filename}
 		>
 			<FileText
 				className={
 					isInline
-						? "h-3 w-3 flex-shrink-0 fill-neutral-300 text-neutral-500"
-						: "h-3.5 w-3.5 flex-shrink-0 fill-neutral-300 text-neutral-500"
+						? "h-3 w-3 flex-shrink-0 text-neutral-700"
+						: "h-3.5 w-3.5 flex-shrink-0 text-neutral-700"
 				}
 			/>
 			<span className="truncate">{display}</span>

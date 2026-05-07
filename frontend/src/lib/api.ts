@@ -123,9 +123,7 @@ export async function uploadDocument(
 export async function fetchDocuments(
 	conversationId: string,
 ): Promise<Document[]> {
-	const res = await fetch(
-		`${BASE}/conversations/${conversationId}/documents`,
-	);
+	const res = await fetch(`${BASE}/conversations/${conversationId}/documents`);
 	return handleResponse<Document[]>(res);
 }
 

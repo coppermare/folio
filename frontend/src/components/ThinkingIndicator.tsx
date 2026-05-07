@@ -1,8 +1,8 @@
-/**
- * 3x3 pulse-grid loader: nine pixels fading in and out with staggered delays.
- * Used while the agent has not yet streamed any content.
- */
-export function ThinkingIndicator() {
+interface ThinkingIndicatorProps {
+	label?: string;
+}
+
+export function ThinkingIndicator({ label }: ThinkingIndicatorProps) {
 	return (
 		<div className="flex items-center gap-2.5 py-1">
 			<div
@@ -15,11 +15,15 @@ export function ThinkingIndicator() {
 						// biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static grid
 						key={i}
 						className="pulse-grid-cell rounded-[1px] bg-[#FF7A42]"
-						style={{ animationDelay: `${(i % 3) * 90 + Math.floor(i / 3) * 60}ms` }}
+						style={{
+							animationDelay: `${(i % 3) * 90 + Math.floor(i / 3) * 60}ms`,
+						}}
 					/>
 				))}
 			</div>
-			<span className="thinking-shimmer text-sm font-medium">Thinking…</span>
+			<span className="thinking-shimmer text-sm font-medium">
+				{label ?? "Thinking…"}
+			</span>
 		</div>
 	);
 }

@@ -1,7 +1,12 @@
 import { Files, Loader2, Menu } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import * as api from "../lib/api";
-import type { Conversation, ConversationDocument, Message } from "../types";
+import type {
+	Citation,
+	Conversation,
+	ConversationDocument,
+	Message,
+} from "../types";
 import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
@@ -55,6 +60,8 @@ interface ChatWindowProps {
 	error: string | null;
 	streaming: boolean;
 	streamingContent: string;
+	streamingSources: Citation[];
+	streamingReasoning: string;
 	hasDocuments: boolean;
 	conversationId: string | null;
 	conversation: Conversation | null;
@@ -80,6 +87,8 @@ export function ChatWindow({
 	error,
 	streaming,
 	streamingContent,
+	streamingSources,
+	streamingReasoning,
 	hasDocuments,
 	conversationId,
 	conversation,
@@ -141,7 +150,7 @@ export function ChatWindow({
 	const isEmpty = !loading && messages.length === 0 && !streaming;
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col bg-white">
+		<div className="flex min-w-[360px] flex-1 flex-col bg-white">
 			{conversation ? (
 				<ChatHeader
 					conversation={conversation}
@@ -191,6 +200,8 @@ export function ChatWindow({
 								<StreamingBubble
 									content={streamingContent}
 									documents={documents}
+									sources={streamingSources}
+									reasoning={streamingReasoning}
 								/>
 							)}
 						</div>
