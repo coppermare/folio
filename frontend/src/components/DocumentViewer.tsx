@@ -30,7 +30,7 @@ export function DocumentViewer({ document }: DocumentViewerProps) {
 				href={getDocumentUrl(document.id)}
 				target="_blank"
 				rel="noreferrer"
-				className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+				className="inline-flex items-center gap-1.5 rounded-control border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
 			>
 				<Download className="h-3.5 w-3.5" />
 				Download

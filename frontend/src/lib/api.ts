@@ -36,6 +36,25 @@ export async function createConversation(): Promise<Conversation> {
 	};
 }
 
+export async function updateConversation(
+	id: string,
+	title: string,
+): Promise<Conversation> {
+	const res = await fetch(`${BASE}/conversations/${id}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ title }),
+	});
+	const detail = await handleResponse<ConversationDetail>(res);
+	return {
+		id: detail.id,
+		title: detail.title,
+		created_at: detail.created_at,
+		updated_at: detail.updated_at,
+		document_count: detail.documents.length,
+	};
+}
+
 export async function deleteConversation(id: string): Promise<void> {
 	const res = await fetch(`${BASE}/conversations/${id}`, {
 		method: "DELETE",

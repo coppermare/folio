@@ -60,7 +60,7 @@ export function FileRow({
 
 	return (
 		<div
-			className={`group flex items-center gap-2 rounded-lg px-2 py-2 transition-colors ${
+			className={`group flex items-center gap-2 rounded-control px-2 py-2 transition-colors ${
 				isActive ? "bg-neutral-100" : "hover:bg-neutral-50"
 			}`}
 		>

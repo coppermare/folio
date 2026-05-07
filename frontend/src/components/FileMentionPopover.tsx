@@ -24,7 +24,7 @@ export function FileMentionPopover({
 		);
 
 	return (
-		<div className="absolute bottom-full left-0 z-30 mb-1 w-72 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg">
+		<div className="absolute bottom-full left-0 z-30 mb-1 w-72 rounded-button border border-neutral-200 bg-white p-1 shadow-lg">
 			{candidates.length === 0 ? (
 				<p className="px-3 py-2 text-xs text-neutral-400">
 					{documents.length === 0
@@ -37,7 +37,7 @@ export function FileMentionPopover({
 						<button
 							key={doc.id}
 							type="button"
-							className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"
+							className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left text-sm hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"
 							onMouseDown={(e) => {
 								// Prevent textarea blur before pick fires.
 								e.preventDefault();

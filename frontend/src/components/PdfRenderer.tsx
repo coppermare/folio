@@ -133,7 +133,7 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 				className="flex-1 overflow-y-auto px-4 pb-4 pt-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutral-200 [&::-webkit-scrollbar]:w-1.5"
 			>
 				{error && (
-					<div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+					<div className="rounded-control bg-red-50 p-3 text-sm text-red-600">
 						{error}
 					</div>
 				)}

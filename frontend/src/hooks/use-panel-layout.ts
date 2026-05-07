@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "folio:workspace-layout";
 
-const MIN_WIDTH = 320;
-const MAX_WIDTH = 720;
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 960;
 const DEFAULT_WIDTH = 440;
 
 interface Layout {
@@ -14,14 +14,14 @@ interface Layout {
 function load(): Layout {
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return { width: DEFAULT_WIDTH, collapsed: false };
+		if (!raw) return { width: DEFAULT_WIDTH, collapsed: true };
 		const parsed = JSON.parse(raw) as Partial<Layout>;
 		return {
 			width: clamp(parsed.width ?? DEFAULT_WIDTH),
 			collapsed: parsed.collapsed === true,
 		};
 	} catch {
-		return { width: DEFAULT_WIDTH, collapsed: false };
+		return { width: DEFAULT_WIDTH, collapsed: true };
 	}
 }
 

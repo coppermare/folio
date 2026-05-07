@@ -3,7 +3,7 @@ import { type ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-	"inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50",
+	"inline-flex items-center justify-center whitespace-nowrap rounded-button text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50",
 	{
 		variants: {
 			variant: {
@@ -15,9 +15,10 @@ const buttonVariants = cva(
 			},
 			size: {
 				default: "h-9 px-4 py-2",
-				sm: "h-8 rounded-md px-3 text-xs",
-				lg: "h-10 rounded-md px-8",
-				icon: "h-9 w-9",
+				sm: "h-8 rounded-control px-3 text-xs",
+				lg: "h-10 rounded-card px-8",
+				icon: "h-9 w-9 rounded-full",
+				iconSm: "h-7 w-7 rounded-full",
 			},
 		},
 		defaultVariants: { variant: "default", size: "default" },

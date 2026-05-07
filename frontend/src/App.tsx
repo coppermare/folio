@@ -10,10 +10,12 @@ import { useMessages } from "./hooks/use-messages";
 export default function App() {
 	const {
 		conversations,
+		selected,
 		selectedId,
 		loading: conversationsLoading,
 		create,
 		select,
+		rename,
 		remove,
 		refresh: refreshConversations,
 	} = useConversations();
@@ -36,8 +38,12 @@ export default function App() {
 	} = useDocuments(selectedId);
 
 	const handleSend = useCallback(
-		async (content: string, documentIds?: string[]) => {
-			await send(content, documentIds);
+		async (
+			content: string,
+			documentIds?: string[],
+			overrideConversationId?: string,
+		) => {
+			await send(content, documentIds, overrideConversationId);
 			refreshConversations();
 		},
 		[send, refreshConversations],
@@ -85,6 +91,7 @@ export default function App() {
 					loading={conversationsLoading}
 					onSelect={select}
 					onCreate={handleCreate}
+					onRename={rename}
 					onDelete={remove}
 				/>
 
@@ -96,10 +103,13 @@ export default function App() {
 					streamingContent={streamingContent}
 					hasDocuments={documents.length > 0}
 					conversationId={selectedId}
+					conversation={selected}
 					documents={documents}
 					ensureConversation={ensureConversation}
 					onSend={handleSend}
 					onUpload={handleUpload}
+					onRename={rename}
+					onDelete={remove}
 				/>
 
 				<WorkspacePanel

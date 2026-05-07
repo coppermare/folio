@@ -1,7 +1,8 @@
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import * as api from "../lib/api";
-import type { ConversationDocument, Message } from "../types";
+import type { Conversation, ConversationDocument, Message } from "../types";
+import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble, StreamingBubble } from "./MessageBubble";
@@ -14,10 +15,17 @@ interface ChatWindowProps {
 	streamingContent: string;
 	hasDocuments: boolean;
 	conversationId: string | null;
+	conversation: Conversation | null;
 	documents: ConversationDocument[];
 	ensureConversation: () => Promise<string | null>;
-	onSend: (content: string, documentIds?: string[]) => void | Promise<void>;
+	onSend: (
+		content: string,
+		documentIds?: string[],
+		overrideConversationId?: string,
+	) => void | Promise<void>;
 	onUpload: (files: File[]) => Promise<{ id: string; filename: string }[]>;
+	onRename: (id: string, title: string) => Promise<void>;
+	onDelete: (id: string) => Promise<void> | void;
 }
 
 export function ChatWindow({
@@ -28,10 +36,13 @@ export function ChatWindow({
 	streamingContent,
 	hasDocuments,
 	conversationId,
+	conversation,
 	documents,
 	ensureConversation,
 	onSend,
 	onUpload,
+	onRename,
+	onDelete,
 }: ChatWindowProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +79,11 @@ export function ChatWindow({
 				}
 			}
 			const documentIds = [...attachments.referenceIds, ...uploadedIds];
-			await onSend(content, documentIds.length > 0 ? documentIds : undefined);
+			await onSend(
+				content,
+				documentIds.length > 0 ? documentIds : undefined,
+				cid,
+			);
 		},
 		[conversationId, ensureConversation, onSend, onUpload],
 	);
@@ -76,8 +91,14 @@ export function ChatWindow({
 	const isEmpty = !loading && messages.length === 0 && !streaming;
 
 	return (
-		<div className="flex flex-1 flex-col bg-white">
-			{!conversationId && !isEmpty && null}
+		<div className="flex min-w-0 flex-1 flex-col bg-white">
+			{conversation && (
+				<ChatHeader
+					conversation={conversation}
+					onRename={onRename}
+					onDelete={onDelete}
+				/>
+			)}
 
 			{loading ? (
 				<div className="flex flex-1 items-center justify-center">
@@ -90,7 +111,7 @@ export function ChatWindow({
 			) : (
 				<>
 					{error && (
-						<div className="mx-4 mt-2 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-600">
+						<div className="mx-4 mt-2 rounded-control bg-red-50 px-4 py-2 text-sm text-red-600">
 							{error}
 						</div>
 					)}
@@ -109,8 +130,6 @@ export function ChatWindow({
 				onSend={handleSend}
 				disabled={streaming}
 				availableDocuments={documents}
-				conversationId={conversationId}
-				ensureConversation={ensureConversation}
 			/>
 		</div>
 	);

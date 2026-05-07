@@ -11,7 +11,7 @@ const TabsList = forwardRef<
 	<TabsPrimitive.List
 		ref={ref}
 		className={cn(
-			"inline-flex items-center gap-0.5 overflow-x-auto",
+			"no-scrollbar inline-flex items-center gap-0.5 overflow-x-auto",
 			className,
 		)}
 		{...props}
@@ -26,7 +26,7 @@ const TabsTrigger = forwardRef<
 	<TabsPrimitive.Trigger
 		ref={ref}
 		className={cn(
-			"group/tab inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-neutral-100 data-[state=active]:text-neutral-900",
+			"group/tab inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-control px-1.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-neutral-100 data-[state=active]:text-neutral-900",
 			className,
 		)}
 		{...props}

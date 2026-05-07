@@ -1,4 +1,4 @@
-import { Paperclip, SendHorizontal } from "lucide-react";
+import { ArrowUp, Plus } from "lucide-react";
 import {
 	type ChangeEvent,
 	type ClipboardEvent,
@@ -31,16 +31,12 @@ interface ChatInputProps {
 	) => void | Promise<void>;
 	disabled: boolean;
 	availableDocuments: ConversationDocument[];
-	conversationId: string | null;
-	ensureConversation: () => Promise<string | null>;
 }
 
 export function ChatInput({
 	onSend,
 	disabled,
 	availableDocuments,
-	conversationId,
-	ensureConversation,
 }: ChatInputProps) {
 	const [value, setValue] = useState("");
 	const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -174,7 +170,7 @@ export function ChatInput({
 		const ta = textareaRef.current;
 		if (!ta) return;
 		ta.style.height = "auto";
-		ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+		ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`;
 
 		// Detect "@" trigger: an @ token at the cursor that isn't attached to a
 		// preceding word character.
@@ -214,19 +210,20 @@ export function ChatInput({
 		[addReference],
 	);
 
-	const handleSend = useCallback(async () => {
+	const handleSend = useCallback(() => {
 		const trimmed = value.trim();
 		if (disabled) return;
 		if (!trimmed && pendingFiles.length === 0 && references.length === 0) {
 			return;
 		}
-		// Ensure a conversation exists before sending.
-		const cid = await ensureConversation();
-		if (!cid) return;
-		await onSend(trimmed, {
+		const snapshot = {
 			pending: pendingFiles.map((p) => p.file),
 			referenceIds: references.map((r) => r.id),
-		});
+		};
+		// Clear the input synchronously so the user sees the textarea empty the
+		// instant they hit send. The actual send + streaming happens in the
+		// background via onSend (ChatWindow.handleSend ensures the conversation
+		// exists before dispatching).
 		setValue("");
 		setPendingFiles([]);
 		setReferences([]);
@@ -234,7 +231,8 @@ export function ChatInput({
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 		}
-	}, [value, disabled, pendingFiles, references, onSend, ensureConversation]);
+		void onSend(trimmed, snapshot);
+	}, [value, disabled, pendingFiles, references, onSend]);
 
 	useEffect(() => {
 		handleSendRef.current = handleSend;
@@ -242,7 +240,7 @@ export function ChatInput({
 
 	const placeholder =
 		availableDocuments.length === 0
-			? "Attach a PDF or ask a question..."
+			? "Ask a question or attach a PDF..."
 			: "Ask a question — type @ to reference a file";
 
 	const canSend =
@@ -252,9 +250,9 @@ export function ChatInput({
 			references.length > 0);
 
 	return (
-		<div className="border-t border-neutral-200 bg-white">
-			<div className="relative p-3">
-				<div className="rounded-xl border border-neutral-200 bg-neutral-50">
+		<div className="px-6 pb-4">
+			<div className="relative mx-auto max-w-2xl">
+				<div className="rounded-3xl border border-neutral-200 bg-white shadow-md">
 					<ChatAttachments
 						pendingFiles={pendingFiles}
 						references={references}
@@ -266,29 +264,7 @@ export function ChatInput({
 						}
 					/>
 
-					<div className="flex items-end gap-2 px-3 py-2">
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-8 w-8 flex-shrink-0"
-							onClick={() => fileInputRef.current?.click()}
-							disabled={
-								disabled || totalAttachments >= MAX_ATTACHMENTS_PER_MESSAGE
-							}
-							aria-label="Attach files"
-						>
-							<Paperclip className="h-4 w-4 text-neutral-500" />
-						</Button>
-
-						<input
-							ref={fileInputRef}
-							type="file"
-							accept=".pdf"
-							multiple
-							className="hidden"
-							onChange={handleFileChange}
-						/>
-
+					<div className="px-3 pt-3 pb-2">
 						<textarea
 							ref={textareaRef}
 							value={value}
@@ -298,23 +274,43 @@ export function ChatInput({
 							onPaste={handlePaste}
 							placeholder={placeholder}
 							rows={1}
-							className="max-h-[200px] min-h-[36px] flex-1 resize-none bg-transparent py-1.5 text-sm text-neutral-800 placeholder-neutral-400 outline-none"
+							className="max-h-[240px] w-full resize-none bg-transparent py-0 text-sm leading-5 text-neutral-800 placeholder-neutral-400 outline-none"
 							disabled={disabled}
 						/>
 
-						<Button
-							variant="ghost"
-							size="icon"
-							className="h-8 w-8 flex-shrink-0"
-							disabled={!canSend}
-							onClick={() => void handleSend()}
-						>
-							<SendHorizontal
-								className={`h-4 w-4 ${
-									canSend ? "text-neutral-900" : "text-neutral-300"
-								}`}
+						<div className="flex items-center justify-between pt-1">
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8 flex-shrink-0 rounded-full"
+								onClick={() => fileInputRef.current?.click()}
+								disabled={
+									disabled || totalAttachments >= MAX_ATTACHMENTS_PER_MESSAGE
+								}
+								aria-label="Attach files"
+							>
+								<Plus className="h-4 w-4 text-neutral-500" />
+							</Button>
+
+							<input
+								ref={fileInputRef}
+								type="file"
+								accept=".pdf"
+								multiple
+								className="hidden"
+								onChange={handleFileChange}
 							/>
-						</Button>
+
+							<button
+								type="button"
+								aria-label="Send message"
+								className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400"
+								disabled={!canSend}
+								onClick={() => void handleSend()}
+							>
+								<ArrowUp className="h-4 w-4" />
+							</button>
+						</div>
 					</div>
 				</div>
 
@@ -327,15 +323,11 @@ export function ChatInput({
 						onClose={() => setMention({ open: false, query: "" })}
 					/>
 				)}
-			</div>
 
-			{warning && <p className="px-4 pb-2 text-xs text-red-500">{warning}</p>}
-			<p className="px-4 pb-2 text-[11px] text-neutral-400">
-				{totalAttachments}/{MAX_ATTACHMENTS_PER_MESSAGE} attachments
-				{conversationId === null && totalAttachments === 0
-					? " · sending starts a new conversation"
-					: ""}
-			</p>
+				{warning && (
+					<p className="mt-2 text-center text-xs text-red-500">{warning}</p>
+				)}
+			</div>
 		</div>
 	);
 }

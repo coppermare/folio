@@ -1,8 +1,8 @@
 import {
-	ChevronLeft,
-	ChevronRight,
 	FileText,
 	Files,
+	PanelLeftOpen,
+	PanelRightOpen,
 	Plus,
 	Upload,
 	X,
@@ -20,6 +20,7 @@ import { useWorkspaceTabs } from "../hooks/use-workspace-tabs";
 import type { ConversationDocument } from "../types";
 import { DocumentViewer } from "./DocumentViewer";
 import { FileRow } from "./FileRow";
+import { Button } from "./ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -54,7 +55,8 @@ export function WorkspacePanel({
 
 			const onMove = (ev: globalThis.MouseEvent) => {
 				const delta = startX - ev.clientX;
-				setWidth(startWidth + delta);
+				const dynamicMax = window.innerWidth - 250 - 320; // sidebar - min chat
+				setWidth(Math.min(startWidth + delta, dynamicMax));
 			};
 			const onUp = () => {
 				setDragging(false);
@@ -69,22 +71,27 @@ export function WorkspacePanel({
 
 	if (collapsed) {
 		return (
-			<div className="flex h-full w-10 flex-shrink-0 flex-col items-center gap-2 bg-white py-3">
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<button
-							type="button"
-							className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
-							onClick={toggleCollapsed}
-							aria-label="Expand workspace"
-						>
-							<ChevronLeft className="h-4 w-4" />
-						</button>
-					</TooltipTrigger>
-					<TooltipContent side="left">Expand workspace</TooltipContent>
-				</Tooltip>
-				<Files className="h-4 w-4 text-neutral-300" />
-				<span className="text-xs text-neutral-400">{documents.length}</span>
+			<div className="flex h-full w-10 flex-shrink-0 flex-col bg-white">
+				<div className="flex h-10 flex-shrink-0 items-center justify-center px-2">
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="iconSm"
+								className="text-neutral-500"
+								onClick={toggleCollapsed}
+								aria-label="Expand workspace"
+							>
+								<PanelRightOpen className="h-4 w-4" />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent side="left">Expand workspace</TooltipContent>
+					</Tooltip>
+				</div>
+				<div className="flex flex-col items-center gap-2 py-3">
+					<Files className="h-4 w-4 text-neutral-300" />
+					<span className="text-xs text-neutral-400">{documents.length}</span>
+				</div>
 			</div>
 		);
 	}
@@ -96,7 +103,7 @@ export function WorkspacePanel({
 	return (
 		<div
 			style={{ width, minWidth, maxWidth }}
-			className="relative flex h-full flex-shrink-0 flex-col border-l border-neutral-200 bg-white"
+			className="relative flex h-full flex-shrink-0 flex-col overflow-hidden border-l border-neutral-200 bg-white"
 		>
 			<button
 				type="button"
@@ -112,7 +119,7 @@ export function WorkspacePanel({
 				onValueChange={setActiveTab}
 				className="flex h-full min-h-0 flex-col"
 			>
-				<div className="flex items-center gap-1 border-b border-neutral-100 px-2 py-1.5">
+				<div className="flex h-10 flex-shrink-0 items-center gap-1 border-b border-neutral-100 px-2">
 					<TabsList className="flex-1">
 						<TabsTrigger value="files" className="gap-1.5">
 							<Files className="h-3.5 w-3.5" />
@@ -136,7 +143,7 @@ export function WorkspacePanel({
 									role="button"
 									tabIndex={0}
 									aria-label={`Close ${doc.filename}`}
-									className="ml-0.5 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+									className="ml-0.5 inline-flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
 									onPointerDown={(e) => {
 										e.stopPropagation();
 										e.preventDefault();
@@ -154,22 +161,25 @@ export function WorkspacePanel({
 							</TabsTrigger>
 						))}
 					</TabsList>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<button
-								type="button"
-								className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
-								onClick={toggleCollapsed}
-								aria-label="Collapse workspace"
-							>
-								<ChevronRight className="h-4 w-4" />
-							</button>
-						</TooltipTrigger>
-						<TooltipContent side="left">Collapse</TooltipContent>
-					</Tooltip>
+					<div className="flex-shrink-0">
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									variant="ghost"
+									size="iconSm"
+									className="text-neutral-500"
+									onClick={toggleCollapsed}
+									aria-label="Collapse workspace"
+								>
+									<PanelLeftOpen className="h-4 w-4" />
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent side="left">Collapse</TooltipContent>
+						</Tooltip>
+					</div>
 				</div>
 
-				<TabsContent value="files" className="flex min-h-0 flex-1 flex-col">
+				<TabsContent value="files" className="data-[state=inactive]:hidden flex min-h-0 flex-1 flex-col">
 					<FilesTabBody
 						conversationId={conversationId}
 						documents={documents}
@@ -262,19 +272,20 @@ function FilesTabBody({
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
-				<span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+			<div className="flex items-center justify-between px-3 py-2">
+				<span className="text-xs font-medium text-neutral-500">
 					Files in this conversation
 				</span>
-				<button
-					type="button"
+				<Button
+					variant="ghost"
+					size="iconSm"
 					onClick={() => fileInputRef.current?.click()}
-					className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+					className="text-neutral-400 hover:text-neutral-600"
 					disabled={uploading}
+					aria-label="Add file"
 				>
-					<Plus className="h-3 w-3" />
-					Add
-				</button>
+					<Plus className="h-3.5 w-3.5" />
+				</Button>
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -298,7 +309,7 @@ function FilesTabBody({
 					<button
 						type="button"
 						onClick={() => fileInputRef.current?.click()}
-						className={`m-3 flex w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-12 text-center transition-colors ${
+						className={`m-3 flex w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card border-2 border-dashed py-12 text-center transition-colors ${
 							dragOver
 								? "border-neutral-400 bg-neutral-50"
 								: "border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
