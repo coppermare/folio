@@ -30,6 +30,10 @@ import { Button } from "./ui/button";
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 
+function hasFiles(e: DragEvent<HTMLDivElement>): boolean {
+	return Array.from(e.dataTransfer.types ?? []).includes("Files");
+}
+
 interface ChatInputProps {
 	onSend: (
 		content: string,
@@ -154,9 +158,6 @@ export function ChatInput({
 		},
 		[addReference, addPendingFiles],
 	);
-
-	const hasFiles = (e: DragEvent<HTMLDivElement>) =>
-		Array.from(e.dataTransfer.types ?? []).includes("Files");
 
 	const handleDragEnter = useCallback(
 		(e: DragEvent<HTMLDivElement>) => {

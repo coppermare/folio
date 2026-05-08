@@ -77,15 +77,18 @@ const ALPHA_ENUM_RE =
 
 export function listifyAlphaEnumeration(content: string): string {
 	if (!content) return content;
-	return content.replace(ALPHA_ENUM_RE, (_full, prefix: string, body: string) => {
-		const items = body
-			.split(/[;,]\s*(?:and\s+)?(?=\([a-z]\)\s)/)
-			.map((s) => s.trim().replace(/\.$/, ""))
-			.filter(Boolean);
-		if (items.length < 2) return _full;
-		const list = items.map((s) => `- ${s}`).join("\n");
-		return `${prefix}\n${list}`;
-	});
+	return content.replace(
+		ALPHA_ENUM_RE,
+		(_full, prefix: string, body: string) => {
+			const items = body
+				.split(/[;,]\s*(?:and\s+)?(?=\([a-z]\)\s)/)
+				.map((s) => s.trim().replace(/\.$/, ""))
+				.filter(Boolean);
+			if (items.length < 2) return _full;
+			const list = items.map((s) => `- ${s}`).join("\n");
+			return `${prefix}\n${list}`;
+		},
+	);
 }
 
 /**

@@ -84,10 +84,7 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 		>
 			<div className="min-w-0">
 				{message.reasoning && (
-					<ThoughtsPanel
-						reasoning={message.reasoning}
-						streaming={false}
-					/>
+					<ThoughtsPanel reasoning={message.reasoning} streaming={false} />
 				)}
 				<SmoothMarkdown
 					content={message.content}
