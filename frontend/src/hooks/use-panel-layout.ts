@@ -68,11 +68,26 @@ export function usePanelLayout() {
 		setLayout((prev) => ({ ...prev, collapsed: !prev.collapsed }));
 	}, []);
 
+	const expandToReadableWidth = useCallback(() => {
+		setLayout((prev) => {
+			const dynamicMax =
+				typeof window !== "undefined"
+					? window.innerWidth - 250 - 360
+					: DEFAULT_WIDTH;
+			const target = Math.max(prev.width, DEFAULT_WIDTH);
+			return {
+				collapsed: false,
+				width: clamp(Math.min(target, Math.max(dynamicMax, MIN_WIDTH))),
+			};
+		});
+	}, []);
+
 	return {
 		width: layout.width,
 		collapsed: layout.collapsed,
 		setWidth,
 		toggleCollapsed,
+		expandToReadableWidth,
 		minWidth: MIN_WIDTH,
 		maxWidth: MAX_WIDTH,
 	};

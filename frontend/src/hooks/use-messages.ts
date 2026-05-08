@@ -43,6 +43,7 @@ export function useMessages(conversationId: string | null) {
 			content: string,
 			documentIds?: string[],
 			overrideConversationId?: string,
+			userName?: string | null,
 		) => {
 			// Allow callers to pass a freshly-resolved conversation id (e.g. when a
 			// new chat was just created in the same tick) — closure-captured state
@@ -67,7 +68,12 @@ export function useMessages(conversationId: string | null) {
 			setError(null);
 
 			try {
-				const response = await api.sendMessage(cid, content, documentIds);
+				const response = await api.sendMessage(
+					cid,
+					content,
+					documentIds,
+					userName,
+				);
 
 				if (!response.body) {
 					throw new Error("No response body");

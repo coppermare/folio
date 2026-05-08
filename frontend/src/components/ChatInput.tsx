@@ -14,6 +14,11 @@ import {
 	decodeFileRef,
 	onAddFileReference,
 } from "../lib/chat-references";
+import {
+	SUPPORTED_UPLOAD_ACCEPT,
+	UNSUPPORTED_FILE_WARNING,
+	isSupportedUploadFile,
+} from "../lib/uploads";
 import type { ConversationDocument } from "../types";
 import {
 	ChatAttachments,
@@ -93,11 +98,9 @@ export function ChatInput({
 
 	const addPendingFiles = useCallback(
 		(files: File[]) => {
-			const filtered = files.filter((f) =>
-				f.name.toLowerCase().endsWith(".pdf"),
-			);
+			const filtered = files.filter((f) => isSupportedUploadFile(f.name));
 			if (filtered.length !== files.length) {
-				setWarning("Only PDF files are supported.");
+				setWarning(UNSUPPORTED_FILE_WARNING);
 			}
 			setPendingFiles((prev) => {
 				const room =
@@ -291,7 +294,7 @@ export function ChatInput({
 
 	const placeholder =
 		availableDocuments.length === 0
-			? "Ask a question or attach a PDF..."
+			? "Ask a question or attach a document..."
 			: "Ask a question — type @ to reference a file";
 
 	const canSend =
@@ -313,7 +316,7 @@ export function ChatInput({
 					{isDragging && (
 						<div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-neutral-400 bg-white/90">
 							<span className="text-sm font-medium text-neutral-600">
-								Drop PDFs to attach
+								Drop files to attach
 							</span>
 						</div>
 					)}
@@ -359,7 +362,7 @@ export function ChatInput({
 							<input
 								ref={fileInputRef}
 								type="file"
-								accept=".pdf"
+								accept={SUPPORTED_UPLOAD_ACCEPT}
 								multiple
 								className="hidden"
 								onChange={handleFileChange}

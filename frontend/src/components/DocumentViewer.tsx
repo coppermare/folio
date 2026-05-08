@@ -1,15 +1,21 @@
 import { Download, FileQuestion } from "lucide-react";
 import { getDocumentUrl } from "../lib/api";
 import type { ConversationDocument } from "../types";
+import { DocxRenderer } from "./DocxRenderer";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 import { PdfRenderer } from "./PdfRenderer";
 
 interface DocumentViewerProps {
 	document: ConversationDocument;
 }
 
-function detectKind(filename: string): "pdf" | "unknown" {
+type DocumentKind = "pdf" | "docx" | "md" | "unknown";
+
+function detectKind(filename: string): DocumentKind {
 	const lower = filename.toLowerCase();
 	if (lower.endsWith(".pdf")) return "pdf";
+	if (lower.endsWith(".docx")) return "docx";
+	if (lower.endsWith(".md")) return "md";
 	return "unknown";
 }
 
@@ -18,6 +24,12 @@ export function DocumentViewer({ document }: DocumentViewerProps) {
 
 	if (kind === "pdf") {
 		return <PdfRenderer documentId={document.id} />;
+	}
+	if (kind === "docx") {
+		return <DocxRenderer documentId={document.id} />;
+	}
+	if (kind === "md") {
+		return <MarkdownRenderer documentId={document.id} />;
 	}
 
 	return (

@@ -63,6 +63,7 @@ interface ChatWindowProps {
 	streamingSources: Citation[];
 	streamingReasoning: string;
 	hasDocuments: boolean;
+	userName?: string | null;
 	conversationId: string | null;
 	conversation: Conversation | null;
 	documents: ConversationDocument[];
@@ -90,6 +91,7 @@ export function ChatWindow({
 	streamingSources,
 	streamingReasoning,
 	hasDocuments,
+	userName,
 	conversationId,
 	conversation,
 	documents,
@@ -175,7 +177,7 @@ export function ChatWindow({
 				</div>
 			) : isEmpty ? (
 				<div className="flex flex-1 items-center justify-center">
-					<EmptyState hasDocuments={hasDocuments} />
+					<EmptyState hasDocuments={hasDocuments} userName={userName ?? null} />
 				</div>
 			) : (
 				<>

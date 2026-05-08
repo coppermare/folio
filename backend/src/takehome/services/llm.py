@@ -124,9 +124,11 @@ SYSTEM_PROMPT = (
     "reference into the `sources` array you return.\n"
     "- For each [cite:N] you emit, populate sources[N] with: document_id (from "
     'the <doc id="…"> attribute exactly), page (1-indexed PDF page where the '
-    "cited content appears), label (a human-readable locator like '§4.2', "
-    "'Schedule 1', 'Recitals'; empty string if no obvious locator), and snippet "
-    "(a verbatim ≤200-char excerpt from that page that supports the claim).\n"
+    "cited content appears, or null for documents that have no '--- Page N ---' "
+    "separators — Markdown and Word documents are not paginated), label (a "
+    "human-readable locator like '§4.2', 'Schedule 1', 'Recitals'; empty string "
+    "if no obvious locator), and snippet (a verbatim ≤200-char excerpt that "
+    "supports the claim).\n"
     "- Use sequential indices starting at 0. If the same passage supports two "
     "sentences, you may reuse the same N (only add it once to sources). If "
     "you refuse under HONESTY RULES because nothing is grounded, return an "
@@ -229,6 +231,7 @@ async def chat_with_documents(
     conversation_history: list[dict[str, str]],
     *,
     referenced_document_ids: list[str] | None = None,
+    user_name: str | None = None,
     result_holder: list[Answer] | None = None,
 ) -> AsyncIterator[LlmEvent]:
     """Stream prose deltas and citation objects from the structured-output agent.
@@ -290,6 +293,13 @@ async def chat_with_documents(
                 f"deictic ('this file') and the reference is unclear across "
                 f"these, ask which one they mean.]\n"
             )
+
+    if user_name and user_name.strip():
+        prompt_parts.append(
+            f"[The user's name is {user_name.strip()}. Do not address them by "
+            "name unless they explicitly ask who they are or otherwise reference "
+            "their identity.]"
+        )
 
     prompt_parts.append(f"User: {user_message}")
     full_prompt = "\n".join(prompt_parts)
@@ -421,6 +431,10 @@ def verify_citations(
     Stripping rules:
     - ``document_id`` not in conversation → strip.
     - ``page`` is not None and outside ``[1, page_count]`` → strip.
+      Non-paginated formats (DOCX, Markdown) have ``page_count == 0``; for
+      those we treat any page value as page-agnostic and clear it to ``None``
+      rather than strip, because the LLM emits ``page=1`` from its schema even
+      when the document has no real pages.
     - ``snippet`` is set but not a case-insensitive substring of
       ``pages[page-1]`` → keep the citation but clear the snippet
       (it likely paraphrased; the page bounds passed so the citation
@@ -444,21 +458,29 @@ def verify_citations(
         if doc is None:
             stripped += 1
             continue
-        if citation.page is not None:
-            if citation.page < 1 or citation.page > max(doc.page_count, 0):
+
+        page = citation.page
+        if page is not None:
+            if doc.page_count == 0:
+                page = None
+            elif page < 1 or page > doc.page_count:
                 stripped += 1
                 continue
 
         snippet = citation.snippet
-        if snippet and citation.page is not None and 0 < citation.page <= len(doc.pages):
-            page_text = doc.pages[citation.page - 1]
+        if snippet and doc.page_count == 0 and doc.pages:
+            full_text = doc.pages[0]
+            if snippet.strip().lower() not in full_text.lower():
+                snippet = None
+        elif snippet and page is not None and 0 < page <= len(doc.pages):
+            page_text = doc.pages[page - 1]
             if snippet.strip().lower() not in page_text.lower():
                 snippet = None  # Bounds attest; semantic match did not.
 
         valid.append(
             Citation(
                 document_id=citation.document_id,
-                page=citation.page,
+                page=page,
                 label=citation.label or "",
                 snippet=snippet,
             )

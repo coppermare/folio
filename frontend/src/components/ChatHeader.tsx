@@ -1,4 +1,4 @@
-import { ChevronDown, Files, Menu } from "lucide-react";
+import { Files, Menu, MoreHorizontal } from "lucide-react";
 import {
 	type KeyboardEvent,
 	useCallback,
@@ -124,7 +124,7 @@ export function ChatHeader({
 						className="h-8 w-8 flex-shrink-0"
 						aria-label="Conversation options"
 					>
-						<ChevronDown className="h-4 w-4 text-neutral-500" />
+						<MoreHorizontal className="h-4 w-4 text-neutral-500" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end">

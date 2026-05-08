@@ -111,3 +111,46 @@ With the ribbon dropped (see "Reframing Layer 2"), the trust signal is now the m
 - Structured `<page n="…">` blocks in the prompt instead of `--- Page N ---` separators.
 - Uncited-claim detection (NLI or second-pass classifier).
 - **Part 3 — Export grounded answers as a client memo.** The export, if pursued, becomes a *trust amplifier* now that grounded answers ships verified citations: the exported memo carries the page numbers, snippets, and confidence state with it. Senior Associate E (1 of 9 verbatim quotes): *"I'm copy-pasting answers from the chat into a Word doc for the client, which defeats the purpose of saving time."*
+
+---
+
+## Part 2c — Multi-format documents & first-run onboarding (2026-05-08)
+
+Two user-visible changes shipped together for [Linear K-116](https://linear.app/) plus a small personalization touch.
+
+### Why
+
+**Multi-format support.** The lawyers in the beta cohort don't only work with PDFs. Title reports often arrive as DOCX from the registry; internal notes, deal summaries, and clause libraries live in Markdown in repos and Notion exports. Forcing a manual PDF conversion before upload was friction — and meaningfully reduced the surface area on which the assistant felt useful. The backend extraction pipeline already supported `.docx` (via `python-docx`) and `.md` (plain UTF-8) since commit `489f7cf`; what was missing was the user-facing edge: file-picker accept attribute, viewer rendering, and correct `Content-Type` headers.
+
+**Onboarding modal.** A first impression of an empty chat with a generic heading ("Your legal documents, decoded.") gave no orientation for new users and nothing to make the tool feel theirs. A two-step carousel — what Folio is, then an optional name — costs ~2 seconds and produces a small but real ownership signal in the empty state ("Hi, {name}.") that persists across sessions.
+
+### Technical decisions
+
+**`docx-preview` for in-browser DOCX rendering, lazy-loaded.** The user direction was explicit: "display as it is, like we do with PDF" — i.e., preserve Word's own formatting, not re-style as plain HTML.
+
+- Considered: `mammoth.js` (DOCX → clean semantic HTML). Rejected — produces correct text but loses paragraph styles, page sizing, and embedded layout. Acceptable for text Q&A; not for "as it is."
+- Considered: server-side LibreOffice headless to convert DOCX → PDF and reuse `PdfRenderer`. Rejected — adds a heavy native dependency to the backend image and a per-document conversion latency; doesn't justify the fidelity gain over `docx-preview` for our threat model (lawyers' own working documents).
+- Chosen: `docx-preview`. Walks the DOCX XML and emits styled DOM that preserves the document's own fonts, sizes, headings, tables, lists, and page breaks — no hardcoded `prose` overrides from us. Loaded via dynamic `import()` in `DocxRenderer` so the ~250kB cost is only paid when a user actually opens a DOCX.
+
+**`react-markdown` + `remark-gfm` for `.md`, with explicit element-level Tailwind styling.** No typography plugin is installed in this codebase, so the renderer applies minimal styling per element type via Tailwind's arbitrary-variant selectors (`[&_h1]:…`, `[&_table]:…`). GFM enables tables, task lists, and strikethrough — common in lawyer notes and clause repos.
+
+**File-type metadata stays out of the DB.** No new `kind` / `mime_type` column on `Document`. Both backend (`_media_type_for(filename)` via extension dispatch) and frontend (`detectKind(filename)`) derive type from the filename suffix at request time. Adding a column would have meant a migration plus per-row populate plus another field to keep in sync; the suffix is the source of truth and the cost of recomputing it is zero. Re-evaluate if we ever support extensions whose true type can't be inferred from the name.
+
+**Citation grounding for non-paginated formats: clear `page` rather than strip.** PDF citations carry a 1-indexed page; DOCX/MD have `page_count = 0` and no page concept. The LLM, following the schema description, still emits `page=1` for non-paginated documents. The original `verify_citations` bounds check (`page <= page_count`) stripped these as out-of-range, which downgraded every non-PDF answer to `ungrounded` despite the prose being grounded. Fix: when `page_count == 0`, treat the citation as page-agnostic — clear `page` to `None` and keep the citation. The system prompt was also updated to instruct the model to use `page=null` for non-paginated docs, but the server-side fix is the load-bearing one (model compliance with the prompt is best-effort).
+
+**Onboarding: localStorage-only, zero backend.** No `User` table, no auth, no per-request header. Two flags — `folio:user:name` and `folio:onboarding:completed` — under the same `folio:` prefix already used by `use-panel-layout`. Greeting is rendered in `EmptyState`; the LLM system prompt is unchanged (a personalized opener doesn't need to flow into the model context, and adding it would touch the message protocol for a UI-only signal).
+
+**Modal can be dismissed via Skip on either step or ESC.** Initial draft blocked ESC and pointer-outside dismissal entirely — interpreting "first-run modal" as something the user must engage with. On a11y review, this fails keyboard users (no exit on step 0 except Tab to Next); per CLAUDE.md style of "honesty over fluency", the right behavior is *easy to skip* rather than *force a flow*. ESC now calls `onComplete(null)` — same as Skip. Pointer-outside still no-ops to avoid accidental dismissal during the brief intro.
+
+### Things explicitly cut
+
+- **Server-side DOCX → PDF conversion.** Heavier infra than the fidelity gain warrants for our docs.
+- **Storing user name on the backend.** Would require a `User` model and per-request identification. Out of scope for a single-tenant beta tool; localStorage is the right fit for a UI-only personalization.
+- **Personalizing the LLM system prompt with the user's name.** The greeting is a UI affordance, not a context for the model. Leaking it into every prompt adds tokens and tempts the model to overuse the name in answers.
+- **Markdown typography plugin.** Adding `@tailwindcss/typography` would have given a one-line `prose` class; chose explicit element styles instead so the markdown panel matches the surrounding Folio neutral palette without a global theme override.
+
+### Known v1 limitations
+
+- **DOCX edge cases.** `docx-preview` loses fidelity on embedded equations, complex SmartArt, and some custom theme XML. Acceptable for legal documents; revisit if a customer hits a real document we can't render.
+- **No file-type icon in the file row.** All formats currently show the same generic file icon. Trivial future polish.
+- **Existing browser sessions see the modal once.** No grandfather flag — anyone whose `localStorage` lacks `folio:onboarding:completed` will see the carousel on next reload. Per user direction; cost is one transient interruption.

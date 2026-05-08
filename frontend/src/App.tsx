@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
 import { useDocuments } from "./hooks/use-documents";
 import { useIsMobile } from "./hooks/use-is-mobile";
 import { useMessages } from "./hooks/use-messages";
+import { useUserPreferences } from "./hooks/use-user-preferences";
 
 export default function App() {
 	const {
@@ -40,6 +42,17 @@ export default function App() {
 		refresh: refreshDocuments,
 	} = useDocuments(selectedId);
 
+	const { userName, setUserName, hasCompletedOnboarding, completeOnboarding } =
+		useUserPreferences();
+
+	const handleOnboardingComplete = useCallback(
+		(name: string | null) => {
+			setUserName(name);
+			completeOnboarding();
+		},
+		[setUserName, completeOnboarding],
+	);
+
 	const isMobile = useIsMobile();
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -65,10 +78,10 @@ export default function App() {
 			documentIds?: string[],
 			overrideConversationId?: string,
 		) => {
-			await send(content, documentIds, overrideConversationId);
+			await send(content, documentIds, overrideConversationId, userName);
 			refreshConversations();
 		},
-		[send, refreshConversations],
+		[send, refreshConversations, userName],
 	);
 
 	const handleUpload = useCallback(
@@ -137,6 +150,7 @@ export default function App() {
 					streamingSources={streamingSources}
 					streamingReasoning={streamingReasoning}
 					hasDocuments={documents.length > 0}
+					userName={userName}
 					conversationId={selectedId}
 					conversation={selected}
 					documents={documents}
@@ -162,6 +176,10 @@ export default function App() {
 					onMobileClose={() => setWorkspaceOpen(false)}
 				/>
 			</div>
+			<OnboardingModal
+				open={!hasCompletedOnboarding}
+				onComplete={handleOnboardingComplete}
+			/>
 		</TooltipProvider>
 	);
 }

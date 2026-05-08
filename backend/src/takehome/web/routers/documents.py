@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from pathlib import PurePath
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
@@ -65,7 +66,7 @@ async def upload_document_endpoint(
     response: Response,
     session: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
-    """Upload a PDF document for a conversation.
+    """Upload a document (PDF, DOCX, or Markdown) for a conversation.
 
     Multiple documents per conversation are supported. If the same file
     (by SHA-256 hash) already exists in this conversation, returns the
@@ -113,12 +114,24 @@ async def list_documents_endpoint(
     return [_to_out(d) for d in documents]
 
 
+_CONTENT_TYPES: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".md": "text/markdown; charset=utf-8",
+}
+
+
+def _media_type_for(filename: str) -> str:
+    suffix = PurePath(filename).suffix.lower()
+    return _CONTENT_TYPES.get(suffix, "application/octet-stream")
+
+
 @router.get("/api/documents/{document_id}/content")
 async def serve_document_file(
     document_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> FileResponse:
-    """Serve the raw PDF file for download/viewing."""
+    """Serve the raw uploaded file for download/viewing."""
     document = await get_document(session, document_id)
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -129,7 +142,7 @@ async def serve_document_file(
     return FileResponse(
         path=document.file_path,
         filename=document.filename,
-        media_type="application/pdf",
+        media_type=_media_type_for(document.filename),
     )
 
 
@@ -138,7 +151,7 @@ async def delete_document_endpoint(
     document_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    """Delete a document, including the underlying PDF file on disk."""
+    """Delete a document, including the underlying file on disk."""
     deleted = await delete_document(session, document_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")
