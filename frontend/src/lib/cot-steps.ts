@@ -70,11 +70,12 @@ export function buildCotSteps({
 		preProse && elapsedMs >= READING_PHASE_MS && elapsedMs < LOCATING_PHASE_MS;
 	const inPreparingPhase = preProse && elapsedMs >= LOCATING_PHASE_MS;
 
+	const firstDoc = documents[0];
 	steps.push({
 		id: "scan",
 		label:
-			documents.length === 1
-				? `Reading ${documents[0]!.filename}`
+			documents.length === 1 && firstDoc
+				? `Reading ${firstDoc.filename}`
 				: `Reading ${documents.length} documents`,
 		status: inReadingPhase ? "active" : "done",
 	});
@@ -92,12 +93,13 @@ export function buildCotSteps({
 		});
 	}
 
+	const firstCited = cited[0];
 	if (cited.length > 0) {
 		steps.push({
 			id: "locate",
 			label:
-				cited.length === 1
-					? `Reading ${cited[0]!.filename}`
+				cited.length === 1 && firstCited
+					? `Reading ${firstCited.filename}`
 					: `Cross-referencing ${cited.length} documents`,
 			status: streaming ? "active" : "done",
 		});
@@ -123,8 +125,9 @@ export function buildCotSteps({
 	// Only one step should be "active" at a time — the latest one.
 	let activeFound = false;
 	for (let i = steps.length - 1; i >= 0; i--) {
-		if (steps[i]!.status === "active") {
-			if (activeFound) steps[i]!.status = "done";
+		const step = steps[i];
+		if (step?.status === "active") {
+			if (activeFound) step.status = "done";
 			else activeFound = true;
 		}
 	}

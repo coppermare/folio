@@ -1,4 +1,4 @@
-import { ChevronDown, FileText } from "lucide-react";
+import { FileText, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import {
 	FILE_REF_MIME,
@@ -92,7 +92,7 @@ export function FileRow({
 						className="text-neutral-400 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
 						aria-label="File actions"
 					>
-						<ChevronDown className="h-4 w-4" />
+						<MoreHorizontal className="h-4 w-4" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="min-w-[12rem]">

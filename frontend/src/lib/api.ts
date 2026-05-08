@@ -83,10 +83,18 @@ export async function sendMessage(
 	conversationId: string,
 	content: string,
 	documentIds?: string[],
+	userName?: string | null,
 ): Promise<Response> {
-	const body: { content: string; document_ids?: string[] } = { content };
+	const body: {
+		content: string;
+		document_ids?: string[];
+		user_name?: string;
+	} = { content };
 	if (documentIds && documentIds.length > 0) {
 		body.document_ids = documentIds;
+	}
+	if (userName && userName.trim().length > 0) {
+		body.user_name = userName.trim();
 	}
 	const res = await fetch(`${BASE}/conversations/${conversationId}/messages`, {
 		method: "POST",

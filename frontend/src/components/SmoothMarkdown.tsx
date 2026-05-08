@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { defaultUrlTransform, Streamdown } from "streamdown";
+import { Streamdown, defaultUrlTransform } from "streamdown";
 import type { Pluggable } from "unified";
 import "streamdown/styles.css";
 import {
@@ -28,11 +28,7 @@ const folioSanitizeSchema = {
 	...defaultSchema,
 	protocols: {
 		...defaultSchema.protocols,
-		href: [
-			...(defaultSchema.protocols?.href ?? []),
-			"folio-doc",
-			"folio-cite",
-		],
+		href: [...(defaultSchema.protocols?.href ?? []), "folio-doc", "folio-cite"],
 	},
 };
 
@@ -150,9 +146,7 @@ function buildComponents(
 					const filename =
 						documents.find((d) => d.id === citation.document_id)?.filename ??
 						null;
-					return (
-						<InlineCitation citation={citation} filename={filename} />
-					);
+					return <InlineCitation citation={citation} filename={filename} />;
 				}
 			}
 			return (

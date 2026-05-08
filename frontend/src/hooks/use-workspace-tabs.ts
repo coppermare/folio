@@ -51,6 +51,7 @@ export function useWorkspaceTabs(
 	// Drop tabs whose documents are no longer present. Compare by joined key so
 	// we don't loop on every render with a freshly allocated array.
 	const idsKey = availableDocIds.join(",");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: idsKey is the stable serialization of availableDocIds; using availableDocIds directly would re-run on every render with a freshly allocated reference.
 	useEffect(() => {
 		if (availableDocIds.length === 0) return;
 		setState((prev) => {
@@ -64,7 +65,6 @@ export function useWorkspaceTabs(
 					: prev.activeTab;
 			return { openTabIds: filtered, activeTab: nextActive };
 		});
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [idsKey]);
 
 	useEffect(() => {

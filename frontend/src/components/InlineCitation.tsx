@@ -53,10 +53,7 @@ export function InlineCitation({ citation, filename }: InlineCitationProps) {
 	const pillText = truncate(displayName, MAX_PILL_CHARS);
 	const popoverName = truncate(displayName, MAX_POPOVER_FILENAME_CHARS);
 	const locator = formatLocator(citation.label);
-	const meta = [
-		citation.page != null ? `Page ${citation.page}` : null,
-		locator,
-	]
+	const meta = [citation.page != null ? `Page ${citation.page}` : null, locator]
 		.filter(Boolean)
 		.join(" · ");
 	const snippet = citation.snippet

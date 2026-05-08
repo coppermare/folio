@@ -19,6 +19,7 @@ import {
 import { usePanelLayout } from "../hooks/use-panel-layout";
 import { useWorkspaceTabs } from "../hooks/use-workspace-tabs";
 import { onOpenDocument } from "../lib/chat-references";
+import { SUPPORTED_UPLOAD_ACCEPT, isSupportedUploadFile } from "../lib/uploads";
 import type { ConversationDocument } from "../types";
 import { DocumentViewer } from "./DocumentViewer";
 import { FileRow } from "./FileRow";
@@ -47,8 +48,15 @@ export function WorkspacePanel({
 	mobileOpen = false,
 	onMobileClose,
 }: WorkspacePanelProps) {
-	const { width, collapsed, setWidth, toggleCollapsed, minWidth, maxWidth } =
-		usePanelLayout();
+	const {
+		width,
+		collapsed,
+		setWidth,
+		toggleCollapsed,
+		expandToReadableWidth,
+		minWidth,
+		maxWidth,
+	} = usePanelLayout();
 	const docIds = useMemo(() => documents.map((d) => d.id), [documents]);
 	const { openTabIds, activeTab, openDoc, closeDoc, setActiveTab, focusFiles } =
 		useWorkspaceTabs(conversationId, docIds);
@@ -65,10 +73,10 @@ export function WorkspacePanel({
 			if (isMobile) {
 				window.dispatchEvent(new CustomEvent("folio:open-workspace"));
 			} else if (collapsed) {
-				toggleCollapsed();
+				expandToReadableWidth();
 			}
 		});
-	}, [docIds, openDoc, isMobile, collapsed, toggleCollapsed]);
+	}, [docIds, openDoc, isMobile, collapsed, expandToReadableWidth]);
 
 	const handleResize = useCallback(
 		(e: MouseEvent) => {
@@ -302,7 +310,7 @@ function FilesTabBody({
 	const handleFiles = (fileList: FileList | null) => {
 		if (!fileList) return;
 		const files = Array.from(fileList).filter((f) =>
-			f.name.toLowerCase().endsWith(".pdf"),
+			isSupportedUploadFile(f.name),
 		);
 		if (files.length > 0) onUpload(files);
 	};
@@ -348,7 +356,7 @@ function FilesTabBody({
 				<input
 					ref={fileInputRef}
 					type="file"
-					accept=".pdf"
+					accept={SUPPORTED_UPLOAD_ACCEPT}
 					multiple
 					className="hidden"
 					onChange={(e) => {
@@ -374,7 +382,7 @@ function FilesTabBody({
 					>
 						<FilePlus className="h-5 w-5 text-neutral-400" />
 						<p className="text-sm font-medium text-neutral-600">
-							Drop PDFs here or click to upload
+							Drop files here or click to upload
 						</p>
 					</button>
 				) : (

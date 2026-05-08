@@ -60,6 +60,7 @@ class MessageOut(BaseModel):
 class MessageCreate(BaseModel):
     content: str
     document_ids: list[str] | None = None
+    user_name: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -285,6 +286,7 @@ async def send_message(
                 documents=doc_contexts,
                 conversation_history=conversation_history,
                 referenced_document_ids=body.document_ids,
+                user_name=body.user_name,
                 result_holder=answer_holder,
             ):
                 if event[0] == "reasoning":

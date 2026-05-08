@@ -44,6 +44,7 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
       - ./frontend/index.html:/app/index.html
       - ./frontend/tailwind.config.js:/app/tailwind.config.js
       - ./frontend/vite.config.ts:/app/vite.config.ts

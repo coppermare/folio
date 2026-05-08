@@ -134,6 +134,47 @@ def test_strip_markers_for_history_handles_both_forms() -> None:
     assert "Rent escalates" in cleaned
 
 
+def test_verify_citations_non_paginated_doc_clears_page() -> None:
+    """DOCX/MD have page_count=0; LLM still emits page=1 from its schema.
+
+    The citation should be kept (page-agnostic) rather than stripped.
+    """
+    docs = [
+        DocumentContext(
+            id="abc",
+            filename="lease.docx",
+            text="rent escalation in section 4.2",
+            page_count=0,
+            pages=["rent escalation in section 4.2"],
+        )
+    ]
+    citations = [Citation(document_id="abc", page=1, label="§4.2", snippet="rent escalation")]
+    valid, confidence = verify_citations(citations, docs)
+    assert confidence == "grounded"
+    assert len(valid) == 1
+    assert valid[0].page is None
+    assert valid[0].snippet == "rent escalation"
+    assert valid[0].label == "§4.2"
+
+
+def test_verify_citations_non_paginated_snippet_match_against_full_text() -> None:
+    """Snippet validation for non-paginated docs uses the full extracted text."""
+    docs = [
+        DocumentContext(
+            id="abc",
+            filename="notes.md",
+            text="The tenant shall pay rent quarterly in advance",
+            page_count=0,
+            pages=["The tenant shall pay rent quarterly in advance"],
+        )
+    ]
+    citations = [
+        Citation(document_id="abc", page=None, label="", snippet="tenant shall pay rent")
+    ]
+    valid, _ = verify_citations(citations, docs)
+    assert valid[0].snippet == "tenant shall pay rent"
+
+
 def test_extract_sources_legacy_doc_id_fallback() -> None:
     """Fallback regex still recognises the legacy [doc:ID] form."""
     docs = [_doc("abc123", "lease.pdf", ["page text"])]
