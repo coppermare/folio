@@ -136,7 +136,7 @@ export function ChatSidebar({
 				<button
 					type="button"
 					aria-label="Close sidebar"
-					className="fixed inset-0 z-40 bg-black/40 md:hidden"
+					className="fixed inset-0 z-40 bg-black/40 lg:hidden"
 					onClick={onMobileClose}
 				/>
 			)}

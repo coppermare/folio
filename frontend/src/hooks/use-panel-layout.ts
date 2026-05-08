@@ -41,6 +41,25 @@ export function usePanelLayout() {
 		}
 	}, [layout]);
 
+	useEffect(() => {
+		const clampToViewport = () => {
+			// 250px ≈ sidebar, 360px = min chat width
+			const dynamicMax = window.innerWidth - 250 - 360;
+			if (dynamicMax < MIN_WIDTH) {
+				// Not enough room — collapse so the chat window stays usable
+				setLayout((prev) => (prev.collapsed ? prev : { ...prev, collapsed: true }));
+			} else {
+				setLayout((prev) => ({
+					...prev,
+					width: Math.min(prev.width, dynamicMax),
+				}));
+			}
+		};
+		clampToViewport();
+		window.addEventListener("resize", clampToViewport);
+		return () => window.removeEventListener("resize", clampToViewport);
+	}, []);
+
 	const setWidth = useCallback((width: number) => {
 		setLayout((prev) => ({ ...prev, width: clamp(width) }));
 	}, []);
