@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Document Q&A for commercial real estate lawyers. Users upload legal PDFs (leases, title reports, environmental assessments) into a conversation and ask questions about them; the AI answers grounded in the documents and cites which ones it used.
 
-Product changes are scoped as Linear issues (e.g. K-115, K-116, K-117). The Linear issue itself carries the design rationale — read it before changing user-facing behaviour.
+Design rationale for user-facing behaviour is documented in `DECISIONS.md` — read it before changing user-facing behaviour.
 
 ## Running it
 
@@ -68,11 +68,11 @@ backend/src/takehome/
 alembic/versions/      Migrations — keep them reversible
 ```
 
-A conversation has many documents and many messages. The 1-doc-per-conversation rule was removed in K-116 — now multiple docs are first-class. Per-conversation hash dedup (SHA-256 over upload bytes, unique on `(conversation_id, content_hash)`) makes re-uploading the same file a silent no-op; the upload endpoint signals this with `200 OK + X-Duplicate-Upload: true` instead of `201 Created`.
+A conversation has many documents and many messages. Multiple docs per conversation are first-class — the original 1-doc-per-conversation rule was removed. Per-conversation hash dedup (SHA-256 over upload bytes, unique on `(conversation_id, content_hash)`) makes re-uploading the same file a silent no-op; the upload endpoint signals this with `200 OK + X-Duplicate-Upload: true` instead of `201 Created`.
 
 ### LLM service: the typed contract
 
-`services/llm.py` is the K-117 swap point. It defines:
+`services/llm.py` defines the typed citation contract. It defines:
 
 - `Citation { document_id, label }` — one cited reference.
 - `Answer { prose, sources: list[Citation] }` — the structured response shape.
@@ -80,7 +80,7 @@ A conversation has many documents and many messages. The 1-doc-per-conversation 
 - `extract_sources(prose, documents)` — regex-parses inline `[doc:ID]` markers into `Citation` records.
 - `strip_citation_markers(prose)` — strips the markers for storage/display.
 
-K-116's deliberate tradeoff: prose streams token-by-token (fast UX); citations are extracted post-stream by regex. K-117 will swap that mechanism for true `output_type=Answer` structured streaming without changing the public shape. **Don't break the `Citation` / `Answer` contract** without coordinating with K-117.
+Prose streams token-by-token (fast UX); citations are extracted post-stream by regex. The current implementation uses true `output_type=Answer` structured streaming. **Don't break the `Citation` / `Answer` contract.**
 
 ### Streaming protocol
 
@@ -104,19 +104,19 @@ frontend/src/
     use-messages.ts    SSE parser + streamingContent
     use-documents.ts   multi-doc state: documents[], activeDocumentId, uploadingCount
   components/
-    DocStrip.tsx       chip strip in ChatWindow header (K-116)
+    DocStrip.tsx       chip strip in ChatWindow header
     ChatWindow.tsx     hosts DocStrip + drag-anywhere upload overlay
     DocumentViewer.tsx PDF viewer; secondary <select> dropdown when 2+ docs
     MessageBubble.tsx  per-message attribution + citation pills
     EmptyState.tsx     full-bleed first-upload tile
-    ChatInput.tsx      textarea + send (paperclip removed in K-116)
+    ChatInput.tsx      textarea + send (no paperclip — upload via drag or DocStrip)
 ```
 
-UI rule (K-116, decision B): **uploading a document does NOT auto-switch the viewer.** Append to the chip strip; user keeps their place. Citation-pill → viewer-jump is K-117's job, not ours.
+UI rule: **uploading a document does NOT auto-switch the viewer.** Append to the chip strip; user keeps their place. Citation-pill → viewer-jump is handled via the citation click flow.
 
 ## Conventions
 
 - Python: ruff (`select = ["E","W","F","I","B","C4","UP"]`, line-length 100), pyright in strict mode. Run via `just check-backend`.
 - Frontend: biome + tsc. Run via `just check-frontend`.
 - Comments only for non-obvious *why*. Avoid narrating *what* the code already says (see existing services and routers — they have very few comments by design).
-- When changing user-visible behaviour, capture the *why* on the Linear issue. Commit messages and PR descriptions stay terse.
+- When changing user-visible behaviour, capture the *why* in `DECISIONS.md`. Commit messages and PR descriptions stay terse.

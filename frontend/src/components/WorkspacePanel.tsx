@@ -54,18 +54,21 @@ export function WorkspacePanel({
 		useWorkspaceTabs(conversationId, docIds);
 	const [dragging, setDragging] = useState(false);
 
-	// Listen for chip-driven open requests from anywhere in the app.
+	// Listen for chip-driven open requests from anywhere in the app. Auto-
+	// surface the workspace if it's currently collapsed/hidden — clicking a
+	// citation pill or file chip while the panel is closed should open it AND
+	// route to the right doc, not silently no-op.
 	useEffect(() => {
 		return onOpenDocument((id) => {
 			if (!docIds.includes(id)) return;
 			openDoc(id);
 			if (isMobile) {
-				// Surface workspace on mobile if a chip click happens while it's hidden.
-				// Parent owns the open state; expose via a window event the App listens to.
 				window.dispatchEvent(new CustomEvent("folio:open-workspace"));
+			} else if (collapsed) {
+				toggleCollapsed();
 			}
 		});
-	}, [docIds, openDoc, isMobile]);
+	}, [docIds, openDoc, isMobile, collapsed, toggleCollapsed]);
 
 	const handleResize = useCallback(
 		(e: MouseEvent) => {
@@ -134,7 +137,7 @@ export function WorkspacePanel({
 				<button
 					type="button"
 					aria-label="Close workspace"
-					className="fixed inset-0 z-40 bg-black/40 md:hidden"
+					className="fixed inset-0 z-40 bg-black/40 lg:hidden"
 					onClick={onMobileClose}
 				/>
 			)}

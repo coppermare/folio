@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import fitz  # PyMuPDF
 import structlog
+from docx import Document as DocxDocument
 from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,8 @@ from takehome.config import settings
 from takehome.db.models import Document
 
 logger = structlog.get_logger()
+
+SUPPORTED_EXTENSIONS = (".pdf", ".md", ".docx")
 
 
 @dataclass
@@ -33,16 +36,16 @@ class UploadResult:
 async def upload_document(
     session: AsyncSession, conversation_id: str, file: UploadFile
 ) -> UploadResult:
-    """Upload and process a PDF document for a conversation.
+    """Upload and process a document for a conversation.
 
-    Multiple documents per conversation are allowed. Re-uploading a file with the
-    same SHA-256 hash inside the same conversation is a silent no-op that
-    returns the existing record with ``duplicate=True``.
+    Accepts PDF, Markdown (.md), and Word (.docx) files. Multiple documents per
+    conversation are allowed. Re-uploading a file with the same SHA-256 hash
+    inside the same conversation is a silent no-op that returns the existing
+    record with ``duplicate=True``.
     """
-    if file.content_type not in ("application/pdf", "application/x-pdf"):
-        filename = file.filename or ""
-        if not filename.lower().endswith(".pdf"):
-            raise ValueError("Only PDF files are supported.")
+    filename = file.filename or ""
+    if not filename.lower().endswith(SUPPORTED_EXTENSIONS):
+        raise ValueError("Only PDF, Markdown, and Word documents are supported.")
 
     content = await file.read()
 
@@ -63,7 +66,7 @@ async def upload_document(
         )
         return UploadResult(document=existing, duplicate=True)
 
-    original_filename = file.filename or "document.pdf"
+    original_filename = file.filename or "document"
     unique_name = f"{uuid.uuid4().hex}_{original_filename}"
     file_path = os.path.join(settings.upload_dir, unique_name)
     os.makedirs(settings.upload_dir, exist_ok=True)
@@ -72,28 +75,19 @@ async def upload_document(
         f.write(content)
 
     logger.info(
-        "Saved uploaded PDF", filename=original_filename, path=file_path, size=len(content)
+        "Saved uploaded document", filename=original_filename, path=file_path, size=len(content)
     )
 
     extracted_text = ""
     page_count = 0
     try:
-        doc = fitz.open(file_path)
-        page_count = len(doc)
-        pages: list[str] = []
-        for page_num in range(page_count):
-            page = doc[page_num]
-            text = page.get_text()  # type: ignore[union-attr]
-            if text.strip():
-                pages.append(f"--- Page {page_num + 1} ---\n{text}")
-        extracted_text = "\n\n".join(pages)
-        doc.close()
+        extracted_text, page_count = _extract_text(file_path, original_filename)
     except Exception:
-        logger.exception("Failed to extract text from PDF", filename=original_filename)
+        logger.exception("Failed to extract text from document", filename=original_filename)
         extracted_text = ""
 
     logger.info(
-        "Extracted text from PDF",
+        "Extracted text from document",
         filename=original_filename,
         page_count=page_count,
         text_length=len(extracted_text),
@@ -111,6 +105,62 @@ async def upload_document(
     await session.commit()
     await session.refresh(document)
     return UploadResult(document=document, duplicate=False)
+
+
+def _extract_text(file_path: str, filename: str) -> tuple[str, int]:
+    """Dispatch to the right extractor based on filename extension.
+
+    Returns ``(extracted_text, page_count)``. Non-PDF formats return
+    ``page_count = 0`` since the concept doesn't apply.
+    """
+    lower = filename.lower()
+    if lower.endswith(".pdf"):
+        return _extract_pdf(file_path)
+    if lower.endswith(".md"):
+        return _extract_markdown(file_path), 0
+    if lower.endswith(".docx"):
+        return _extract_docx(file_path), 0
+    raise ValueError(f"Unsupported file type: {filename}")
+
+
+def _extract_pdf(file_path: str) -> tuple[str, int]:
+    doc = fitz.open(file_path)
+    page_count = len(doc)
+    pages: list[str] = []
+    for page_num in range(page_count):
+        page = doc[page_num]
+        text = page.get_text()  # type: ignore[union-attr]
+        if text.strip():
+            pages.append(f"--- Page {page_num + 1} ---\n{text}")
+    doc.close()
+    return "\n\n".join(pages), page_count
+
+
+def _extract_markdown(file_path: str) -> str:
+    with open(file_path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def _extract_docx(file_path: str) -> str:
+    """Walk paragraphs and tables in document order, preserving reading flow."""
+    docx = DocxDocument(file_path)
+    parts: list[str] = []
+    for block in docx.element.body.iterchildren():
+        tag = block.tag.split("}")[-1]
+        if tag == "p":
+            text = "".join(node.text or "" for node in block.iter() if node.tag.endswith("}t"))
+            if text.strip():
+                parts.append(text)
+        elif tag == "tbl":
+            for row in block.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"):
+                cells = [
+                    "".join(node.text or "" for node in cell.iter() if node.tag.endswith("}t"))
+                    for cell in row.iter(
+                        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"
+                    )
+                ]
+                parts.append("\t".join(cells))
+    return "\n".join(parts)
 
 
 async def get_document(session: AsyncSession, document_id: str) -> Document | None:
@@ -143,9 +193,7 @@ async def _get_by_conversation_and_hash(
     return result.scalar_one_or_none()
 
 
-async def get_documents_by_ids(
-    session: AsyncSession, document_ids: list[str]
-) -> list[Document]:
+async def get_documents_by_ids(session: AsyncSession, document_ids: list[str]) -> list[Document]:
     """Fetch a list of documents by their ids, preserving the input ordering."""
     if not document_ids:
         return []

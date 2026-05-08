@@ -49,5 +49,38 @@ export function onOpenDocument(listener: OpenListener): () => void {
 }
 
 export function emitOpenDocument(id: string) {
+	// Clear stale jump intents queued for OTHER docs — clicking pill A then doc
+	// chip B shouldn't strand A's pending jump for the next time A is opened.
+	for (const key of Object.keys(pendingJumps)) {
+		if (key !== id) delete pendingJumps[key];
+	}
 	for (const l of openListeners) l(id);
+}
+
+// --- Inline citation: jump-to-page within a document --- //
+// PdfRenderer.handleJump is an internal closure, so we use a pub/sub channel
+// (mirroring emitOpenDocument) plus a sticky last-value buffer keyed by
+// documentId. The buffer covers the async gap when a citation triggers
+// emitOpenDocument for a doc that hasn't mounted yet — PdfRenderer reads its
+// pending entry on mount and consumes-and-clears it.
+
+type JumpListener = (documentId: string, page: number) => void;
+const jumpListeners = new Set<JumpListener>();
+const pendingJumps: Record<string, number> = {};
+
+export function onJumpToPage(listener: JumpListener): () => void {
+	jumpListeners.add(listener);
+	return () => jumpListeners.delete(listener);
+}
+
+export function emitJumpToPage(documentId: string, page: number) {
+	pendingJumps[documentId] = page;
+	for (const l of jumpListeners) l(documentId, page);
+}
+
+export function consumePendingJump(documentId: string): number | null {
+	const page = pendingJumps[documentId];
+	if (page === undefined) return null;
+	delete pendingJumps[documentId];
+	return page;
 }

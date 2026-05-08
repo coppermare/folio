@@ -1,18 +1,14 @@
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
-import { citedDocuments } from "../lib/file-chip-utils";
+import { useEffect, useState } from "react";
+import { buildCotSteps } from "../lib/cot-steps";
+import { citationDocuments } from "../lib/file-chip-utils";
 import type { Citation, ConversationDocument, Message } from "../types";
 import { CopyButton } from "./CopyButton";
 import { FileChip } from "./FileChip";
 import { SmoothMarkdown } from "./SmoothMarkdown";
 import { ThinkingIndicator } from "./ThinkingIndicator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-
-const DOC_MARKER_RE = /\[doc:[0-9a-fA-F]{4,}(?:\s*[,;:][^\]]*)?\]/g;
-
-function stripCitationMarkers(text: string): string {
-	return text.replace(DOC_MARKER_RE, "").replace(/[ \t]{2,}/g, " ");
-}
+import { ThoughtsPanel } from "./ThoughtsPanel";
 
 interface MessageBubbleProps {
 	message: Message;
@@ -34,11 +30,11 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 	}
 
 	if (message.role === "user") {
-		const attachedDocs =
+		const attachedDocs: ConversationDocument[] =
 			message.document_ids && message.document_ids.length > 0
 				? message.document_ids
 						.map((id) => documents.find((d) => d.id === id))
-						.filter(Boolean)
+						.filter((d): d is ConversationDocument => d !== undefined)
 				: [];
 
 		return (
@@ -56,12 +52,12 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 						<div className="flex flex-col items-end gap-1">
 							{attachedDocs.map((d) => (
 								<span
-									key={d!.id}
+									key={d.id}
 									className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-0.5 text-xs text-neutral-600"
-									title={d!.filename}
+									title={d.filename}
 								>
 									<FileText className="h-3 w-3 flex-shrink-0 text-neutral-400" />
-									<span className="truncate">{d!.filename}</span>
+									<span className="truncate">{d.filename}</span>
 								</span>
 							))}
 						</div>
@@ -77,8 +73,7 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 	}
 
 	const citations = message.sources ?? [];
-	const cleanContent = stripCitationMarkers(message.content);
-	const cited = citedDocuments(cleanContent, documents);
+	const drewOnDocs = citationDocuments(citations, documents);
 
 	return (
 		<motion.div
@@ -88,15 +83,20 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 			className="py-2"
 		>
 			<div className="min-w-0">
-				<AttributionLine
-					citations={citations}
+				{message.reasoning && (
+					<ThoughtsPanel
+						reasoning={message.reasoning}
+						streaming={false}
+					/>
+				)}
+				<SmoothMarkdown
+					content={message.content}
 					documents={documents}
-					documentCount={documents.length}
+					sources={citations}
 				/>
-				<SmoothMarkdown content={cleanContent} documents={documents} />
-				{cited.length > 0 && (
-					<div className="mt-3 flex flex-wrap gap-1.5">
-						{cited.map((d) => (
+				{drewOnDocs.length > 0 && (
+					<div className="mt-3 flex flex-wrap items-center gap-1.5">
+						{drewOnDocs.map((d) => (
 							<FileChip
 								key={d.id}
 								id={d.id}
@@ -106,7 +106,6 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 						))}
 					</div>
 				)}
-				<CitationPills citations={citations} documents={documents} />
 				<div className="mt-2 flex items-center gap-1">
 					<CopyButton text={message.content} />
 				</div>
@@ -118,104 +117,49 @@ export function MessageBubble({ message, documents }: MessageBubbleProps) {
 interface StreamingBubbleProps {
 	content: string;
 	documents: ConversationDocument[];
+	sources?: Citation[] | null;
+	reasoning?: string;
 }
 
-export function StreamingBubble({ content, documents }: StreamingBubbleProps) {
-	const cleanContent = stripCitationMarkers(content);
+export function StreamingBubble({
+	content,
+	documents,
+	sources = null,
+	reasoning = "",
+}: StreamingBubbleProps) {
+	const [elapsedMs, setElapsedMs] = useState(0);
+	useEffect(() => {
+		const start = Date.now();
+		const id = window.setInterval(() => {
+			setElapsedMs(Date.now() - start);
+		}, 100);
+		return () => window.clearInterval(id);
+	}, []);
+
+	const steps = buildCotSteps({
+		streaming: true,
+		streamingContent: content,
+		documents,
+		elapsedMs,
+	});
+	const activeStep = steps.find((s) => s.status === "active");
+	const stepLabel = activeStep ? `${activeStep.label}…` : undefined;
+
 	return (
 		<div className="py-2">
 			<div className="min-w-0">
-				{cleanContent ? (
+				<ThoughtsPanel reasoning={reasoning} streaming />
+				{content ? (
 					<SmoothMarkdown
-						content={cleanContent}
+						content={content}
 						documents={documents}
+						sources={sources}
 						streaming
 					/>
-				) : (
-					<ThinkingIndicator />
+				) : reasoning ? null : (
+					<ThinkingIndicator label={stepLabel} />
 				)}
 			</div>
-		</div>
-	);
-}
-
-interface AttributionLineProps {
-	citations: Citation[];
-	documents: ConversationDocument[];
-	documentCount: number;
-}
-
-function AttributionLine({
-	citations,
-	documents,
-	documentCount,
-}: AttributionLineProps) {
-	if (documentCount === 0 || citations.length === 0) return null;
-
-	const usedIds = Array.from(new Set(citations.map((c) => c.document_id)));
-	const usedDocs = usedIds
-		.map((id) => documents.find((d) => d.id === id))
-		.filter((d): d is ConversationDocument => d !== undefined);
-
-	const usedCount = usedDocs.length;
-	const allUsed = usedCount > 0 && usedCount === documentCount;
-	const label = allUsed
-		? `Answered from all ${documentCount} document${documentCount === 1 ? "" : "s"}`
-		: `Answered from ${usedCount} of ${documentCount} document${documentCount === 1 ? "" : "s"}`;
-
-	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<p className="mb-1 inline-flex cursor-help text-xs text-neutral-400">
-					{label}
-				</p>
-			</TooltipTrigger>
-			<TooltipContent>
-				<ul className="space-y-0.5 text-xs">
-					{usedDocs.map((d) => (
-						<li key={d.id} className="truncate">
-							• {d.filename}
-						</li>
-					))}
-				</ul>
-			</TooltipContent>
-		</Tooltip>
-	);
-}
-
-interface CitationPillsProps {
-	citations: Citation[];
-	documents: ConversationDocument[];
-}
-
-function CitationPills({ citations, documents }: CitationPillsProps) {
-	if (citations.length === 0) return null;
-
-	const seen = new Set<string>();
-	const unique = citations.filter((c) => {
-		const key = `${c.document_id}::${c.label}`;
-		if (seen.has(key)) return false;
-		seen.add(key);
-		return true;
-	});
-
-	return (
-		<div className="mt-2 flex flex-wrap gap-1.5">
-			{unique.map((c, idx) => {
-				const doc = documents.find((d) => d.id === c.document_id);
-				const display = doc
-					? `${doc.filename.replace(/\.pdf$/i, "")}${c.label && c.label !== doc.filename ? ` · ${c.label}` : ""}`
-					: c.label;
-				return (
-					<span
-						// biome-ignore lint/suspicious/noArrayIndexKey: stable order from server
-						key={`${c.document_id}-${idx}`}
-						className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600"
-					>
-						{display}
-					</span>
-				);
-			})}
 		</div>
 	);
 }

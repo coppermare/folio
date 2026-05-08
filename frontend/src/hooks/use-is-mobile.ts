@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-const MOBILE_QUERY = "(max-width: 767.98px)";
+const MOBILE_QUERY = "(max-width: 1023.98px)";
 
 function subscribe(callback: () => void) {
 	if (typeof window === "undefined") return () => {};

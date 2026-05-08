@@ -89,11 +89,16 @@ export function ChatSidebar({
 							<Button
 								variant="ghost"
 								size="iconSm"
-								className="text-neutral-500"
+								className="group relative text-neutral-500"
 								onClick={() => setCollapsed(false)}
 								aria-label="Expand sidebar"
 							>
-								<PanelLeftOpen className="h-4 w-4" />
+								<img
+									src="/symbol.svg"
+									alt="Folio"
+									className="h-6 w-6 transition-opacity group-hover:opacity-0"
+								/>
+								<PanelLeftOpen className="absolute h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
 							</Button>
 						</TooltipTrigger>
 						<TooltipContent side="right">Expand sidebar</TooltipContent>
@@ -131,13 +136,13 @@ export function ChatSidebar({
 				<button
 					type="button"
 					aria-label="Close sidebar"
-					className="fixed inset-0 z-40 bg-black/40 md:hidden"
+					className="fixed inset-0 z-40 bg-black/40 lg:hidden"
 					onClick={onMobileClose}
 				/>
 			)}
 			<div className={containerClass}>
 				<div className="flex h-10 flex-shrink-0 items-center justify-between px-3">
-					<span className="text-sm font-semibold text-neutral-800">Folio</span>
+					<img src="/folio_logo.svg" alt="Folio" className="h-6" />
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<Button

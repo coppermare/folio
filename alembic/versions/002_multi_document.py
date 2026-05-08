@@ -4,8 +4,7 @@ Revision ID: 002_multi_document
 Revises: 001_initial
 Create Date: 2026-05-06 00:00:00.000000
 
-Adds the schema needed for K-116 (multi-doc conversations) and K-117
-(grounded citations).
+Adds the schema needed for multi-doc conversations and grounded citations.
 
 - ``messages.sources``: JSONB array of ``{"document_id": str, "label": str}``
   entries, populated by the typed LLM output. ``sources_cited`` (int) is

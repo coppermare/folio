@@ -43,7 +43,6 @@ body {
 	background-color: #a3a3a3;
 }
 
-
 /* Smooth markdown reveal — fades content as it streams in.
  * ease-out for a responsive feel; transform-free so we don't reflow during stream. */
 @keyframes smooth-md-fade-in {
@@ -60,7 +59,6 @@ body {
 .smooth-md--streaming > * {
 	animation: smooth-md-fade-in 360ms ease-out both;
 }
-
 
 /* Shimmering "Thinking…" — gentle gradient sweep across icon + text. */
 @keyframes thinking-shimmer {

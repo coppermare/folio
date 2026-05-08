@@ -303,7 +303,7 @@ export function ChatInput({
 	return (
 		<div className="px-3 pb-3 md:px-6 md:pb-4">
 			<div
-				className="relative mx-auto max-w-2xl"
+				className="relative mx-auto max-w-3xl"
 				onDragEnter={handleDragEnter}
 				onDragOver={handleDragOver}
 				onDragLeave={handleDragLeave}

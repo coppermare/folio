@@ -2,45 +2,99 @@ from __future__ import annotations
 
 import re
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Literal
 
-from pydantic import BaseModel, Field
+import structlog
+from pydantic import BaseModel, Field, ValidationError
 from pydantic_ai import Agent
 
-from takehome.config import settings  # noqa: F401 — triggers ANTHROPIC_API_KEY export
+from takehome.config import settings as _settings  # noqa: F401 — triggers ANTHROPIC_API_KEY export
+
+_ = _settings  # touch to silence pyright's unused-import check
+
+logger = structlog.get_logger()
+
 
 # --------------------------------------------------------------------------- #
-# Typed output contract (foundation for K-117 grounded citations)
+# Typed output contract
 # --------------------------------------------------------------------------- #
+
+ConfidenceState = Literal["grounded", "partial", "ungrounded"]
 
 
 class Citation(BaseModel):
-    """A reference from an answer back to a specific document."""
+    """A reference from an answer back to a specific document and page."""
 
-    document_id: str = Field(description="ID of the cited document")
+    document_id: str = Field(
+        description='ID of the cited document. Use the id attribute from <doc id="…"> exactly.'
+    )
+    page: int | None = Field(
+        default=None,
+        description="1-indexed PDF page where the cited content appears, or null if page-agnostic.",
+    )
     label: str = Field(
-        description="Human-readable locator: section, clause, page, etc.",
         default="",
+        description="Human-readable locator: section, clause, schedule, etc. (e.g. '§4.2', 'Schedule 1').",
+    )
+    snippet: str | None = Field(
+        default=None,
+        description="Verbatim ≤200-char excerpt from the cited page that supports the claim.",
     )
 
 
 class Answer(BaseModel):
-    """An assistant answer with grounded citations.
+    """An assistant answer with grounded inline citations.
 
-    The shape is the contract K-117 layers richer citations on top of. K-116
-    populates ``sources`` from ``[doc:ID]``-style markers the model emits while
-    streaming prose; K-117 will replace that with true structured output.
+    Field order matters — PydanticAI streams JSON in declaration order:
+    1. ``reasoning`` first: the model's visible chain-of-thought, surfaced in
+       a "Thoughts" panel as it streams.
+    2. ``sources`` next: the citation array, available before prose so
+       ``[cite:N]`` markers resolve inline the moment prose tokens arrive.
+    3. ``prose`` last: the final answer text the user reads.
     """
 
-    prose: str
-    sources: list[Citation] = Field(default_factory=list)
+    reasoning: str = Field(
+        default="",
+        description=(
+            "Your step-by-step thought process before answering. Cover: what the "
+            "user is actually asking, which document(s) and section(s) are likely "
+            "relevant, key passages you've located, and how you'll structure the "
+            "answer. Plain prose, 3-6 short sentences. This is shown to the user "
+            "as a transparent reasoning trace — write it for them, not for "
+            "yourself, but keep it concise."
+        ),
+    )
+    sources: list[Citation] = Field(default_factory=lambda: [])  # noqa: PIE807
+    prose: str = Field(
+        description="The answer text. Embed [cite:N] markers inline immediately after each supported claim."
+    )
 
 
 @dataclass
 class DocumentContext:
+    """A document in the LLM prompt context.
+
+    ``pages`` is the per-page raw text (1-indexed conceptually; ``pages[0]`` is page 1).
+    ``page_count`` is the number of pages with extractable text.
+    """
+
     id: str
     filename: str
     text: str | None
+    page_count: int = 0
+    pages: list[str] = field(default_factory=lambda: [])  # noqa: PIE807
+
+
+# Tagged event union yielded by chat_with_documents.
+# ("reasoning", str)   — visible chain-of-thought delta, shown in Thoughts panel.
+# ("content", str)     — prose delta to stream to the client.
+# ("source", Citation) — a single citation that just became available.
+LlmEvent = (
+    tuple[Literal["reasoning"], str]
+    | tuple[Literal["content"], str]
+    | tuple[Literal["source"], Citation]
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -50,28 +104,106 @@ class DocumentContext:
 
 SYSTEM_PROMPT = (
     "You are a helpful legal document assistant for commercial real estate "
-    "lawyers. You help lawyers review and understand documents during due "
-    "diligence.\n\n"
-    "IMPORTANT INSTRUCTIONS:\n"
-    "- Answer questions based on the document content provided in <doc> blocks.\n"
-    "- When you draw on a specific document, cite it inline using the marker "
-    "  [doc:DOCUMENT_ID] immediately after the claim. Use the id from the "
-    "  <doc id=\"…\"> tag exactly. Use one marker per supporting reference; "
-    "  it is fine to combine multiple markers (e.g. [doc:abc][doc:xyz]).\n"
-    "- Where helpful, also reference the section, clause, or page in prose "
-    "  (e.g. \"Section 4.2\", \"Page 12\").\n"
-    "- If the answer is not in any document, say so clearly. Do not fabricate.\n"
+    "lawyers. You help lawyers review and understand documents during due diligence.\n\n"
+    "GROUNDING RULES (strict):\n"
+    "- Answer questions based on the document content provided in <doc> blocks. "
+    "Each <doc> contains content split by '--- Page N ---' separators that mark "
+    "page boundaries.\n"
+    "- OUTPUT ORDER: emit `reasoning` FIRST (visible chain-of-thought, shown to "
+    "the user in a Thoughts panel), then `sources`, then `prose`. This order is "
+    "non-negotiable — the streaming UI relies on it for the Thoughts panel and "
+    "for inline citation resolution.\n"
+    "- REASONING field: 3-6 short sentences explaining what you're doing. Talk "
+    "to the user, not to yourself. Cover: what they're really asking, which "
+    "section(s) you'll consult, and how you'll structure the answer. Do not "
+    "repeat the answer here. If your reasoning notes uncertainty or a gap, "
+    "your prose must reflect it — never sound more confident in `prose` than "
+    "in `reasoning`.\n"
+    "- When you draw on a specific document, cite it INLINE using a [cite:N] "
+    "marker placed immediately after the supported claim. N is a 0-indexed "
+    "reference into the `sources` array you return.\n"
+    "- For each [cite:N] you emit, populate sources[N] with: document_id (from "
+    'the <doc id="…"> attribute exactly), page (1-indexed PDF page where the '
+    "cited content appears), label (a human-readable locator like '§4.2', "
+    "'Schedule 1', 'Recitals'; empty string if no obvious locator), and snippet "
+    "(a verbatim ≤200-char excerpt from that page that supports the claim).\n"
+    "- Use sequential indices starting at 0. If the same passage supports two "
+    "sentences, you may reuse the same N (only add it once to sources). If "
+    "you refuse under HONESTY RULES because nothing is grounded, return an "
+    "empty sources array — do not pad it with tangentially-related citations "
+    "to satisfy the schema.\n"
+    "- DEICTIC REFERENCES: when documents are loaded and the user says 'this "
+    "file', 'this lease', 'this document', 'have a look at this', etc., they "
+    "are referring to the document(s) already in your context — never assume "
+    "a new file is missing or ask them to upload again. If multiple docs are "
+    "loaded and the reference is ambiguous, ask which one they mean — UNLESS "
+    "the question is ungrounded across all loaded docs, in which case refuse "
+    "per HONESTY RULES rather than asking.\n"
     "- Be concise and precise. Lawyers value accuracy over verbosity.\n\n"
+    "HONESTY RULES (strict — these override fluency):\n"
+    "- REFUSE WHEN UNGROUNDED. If the central factual claim of your answer "
+    "cannot be supported by a [cite:N] from the loaded documents, you MUST "
+    "refuse rather than guess. Use one of these patterns:\n"
+    "  • 'I don't see [topic] in the loaded documents. The [doc name] covers "
+    "[what it does cover], but not [what's missing].'\n"
+    "  • 'The loaded documents don't address this. You may need [type of "
+    "document — e.g. the SPA, the title plan, an environmental report] to "
+    "answer it.'\n"
+    "  • 'I cannot answer this from [doc name] alone — the relevant "
+    "section appears to be missing or covered in a document not loaded here.'\n"
+    "- DOCUMENTED ABSENCE IS NOT A REFUSAL. If the document does address the "
+    "topic but answers in the negative (e.g. the lease genuinely grants no "
+    "break right, the SPA contains no environmental warranty), say so "
+    "positively and cite the relevant section — e.g. 'The lease grants no "
+    "break right; §3 sets the term as 10 years with no early-termination "
+    "clause.[cite:N]'. Do NOT use 'I don't see…' when the document itself "
+    "answers 'no'.\n"
+    "- TEXT-EXTRACTION FAILURE. If a <doc> block's body is the literal string "
+    "'[Text extraction failed for this document — preview only.]', do not "
+    "guess at its contents. Tell the user plainly: 'I cannot read "
+    "[filename] — its text did not extract. It may be a scanned PDF; please "
+    "re-upload as searchable text.'\n"
+    "- PARTIAL COVERAGE. If the answer is only partially in the documents, "
+    "cite what is covered AND explicitly name what is not. Do not paper over "
+    "gaps with generic legal commentary.\n"
+    "- NO FABRICATION. Never invent clause numbers, page numbers, section "
+    "labels, defined terms, party names, dates, or monetary figures. If you "
+    "would write 'Section 14' or 'page 23' without having located that exact "
+    "text in a <doc>, stop and refuse instead. Never invent a document_id.\n"
+    "- FLAG SPECULATION. If the user asks for inference beyond the documents "
+    "(market practice, general drafting norms), you MAY add ONE short sentence "
+    "(or at most two) prefixed with 'Beyond the documents:'. Grounded analysis "
+    "with citations must come first; speculation never replaces a refusal, "
+    "and never appears without grounded content preceding it. If the entire "
+    "answer would be speculative, refuse instead.\n"
+    "- Honesty is faster than the lawyer back-checking your work. A clear "
+    "'I don't know from these documents' beats a confident-sounding answer "
+    "that turns out wrong.\n\n"
     "FORMATTING RULES (strict):\n"
-    "- Write in short, well-spaced paragraphs and bullet lists. Default to flowing prose; use bullets only when listing distinct items.\n"
-    "- Use Markdown for emphasis (**bold**, *italic*) and short headings (## or ###) when sections truly help.\n"
-    "- DO NOT use Markdown tables or any pipe-delimited (`|`) formatting. Never produce rows like `| col | col |`.\n"
+    "- Write in short, well-spaced paragraphs and bullet lists. Default to "
+    "flowing prose; use bullets only when listing distinct items.\n"
+    "- When you would naturally enumerate '(a) X; (b) Y; (c) Z' or 'first... "
+    "second... third...', render as a Markdown bullet list (one '- ' per "
+    "item) instead of inline prose. Keep the (a)/(b)/(c) prefix on each "
+    "bullet when the source document references those labels — they are "
+    "cross-referenced elsewhere.\n"
+    "- Use Markdown for emphasis (**bold**, *italic*) and short headings (## "
+    "or ###) when sections truly help.\n"
+    "- DO NOT use Markdown tables or any pipe-delimited (`|`) formatting.\n"
     "- DO NOT use ASCII art, separators (---, ===), or decorative characters.\n"
     "- DO NOT prefix bullets with extra symbols beyond a single `-` or `•`.\n"
     "- Keep lines reasonably short and avoid trailing whitespace."
 )
 
-agent = Agent("anthropic:claude-haiku-4-5-20251001", system_prompt=SYSTEM_PROMPT)
+# Sonnet for chat — higher reliability with structured output on long lease text.
+chat_agent = Agent(
+    "anthropic:claude-sonnet-4-6",
+    output_type=Answer,
+    system_prompt=SYSTEM_PROMPT,
+)
+
+# Haiku for short-form tasks (title generation).
+title_agent = Agent("anthropic:claude-haiku-4-5-20251001")
 
 
 # --------------------------------------------------------------------------- #
@@ -81,7 +213,7 @@ agent = Agent("anthropic:claude-haiku-4-5-20251001", system_prompt=SYSTEM_PROMPT
 
 async def generate_title(user_message: str) -> str:
     """Generate a 3-5 word conversation title from the first user message."""
-    result = await agent.run(
+    result = await title_agent.run(
         f"Generate a concise 3-5 word title for a conversation that starts with: '{user_message}'. "
         "Return only the title, nothing else."
     )
@@ -95,20 +227,27 @@ async def chat_with_documents(
     user_message: str,
     documents: list[DocumentContext],
     conversation_history: list[dict[str, str]],
-) -> AsyncIterator[str]:
-    """Stream prose chunks for an answer grounded in zero-or-more documents.
+    *,
+    referenced_document_ids: list[str] | None = None,
+    result_holder: list[Answer] | None = None,
+) -> AsyncIterator[LlmEvent]:
+    """Stream prose deltas and citation objects from the structured-output agent.
 
-    The full prose is also retained internally so :func:`extract_sources` can
-    derive structured ``Citation`` records from inline ``[doc:ID]`` markers
-    after streaming completes. The router calls ``extract_sources`` on the
-    accumulated full response.
+    Yields ``("content", delta)`` for prose and ``("source", Citation)`` for
+    each source object as it becomes available in ``partial.sources``.  Sources
+    are emitted as soon as PydanticAI's incremental JSON parser closes each
+    source object, so citation pills appear on the client without waiting for
+    the full sources array to complete.
+
+    After the stream completes the final validated :class:`Answer` is appended
+    to ``result_holder`` if provided.
     """
     prompt_parts: list[str] = []
 
     if documents:
         prompt_parts.append(
             "The following documents are loaded for this conversation. "
-            "When you cite, use the id attribute on the surrounding <doc> tag.\n"
+            "When you cite, use the id attribute on the surrounding <doc> tag exactly.\n"
         )
         for d in documents:
             text = d.text or "[Text extraction failed for this document — preview only.]"
@@ -130,15 +269,84 @@ async def chat_with_documents(
                 prompt_parts.append(f"Assistant: {content}\n")
         prompt_parts.append("\n")
 
+    # Per-turn anchor: when the user @-attached files this turn, surface them
+    # right next to the user message so deictic phrases ("this file", "have a
+    # look at this") resolve to the right document(s).
+    referenced_filenames: list[str] = []
+    if referenced_document_ids and documents:
+        ref_set = set(referenced_document_ids)
+        referenced_filenames = [d.filename for d in documents if d.id in ref_set]
+
+    if referenced_filenames:
+        names = ", ".join(f'"{n}"' for n in referenced_filenames)
+        if len(referenced_filenames) == 1:
+            prompt_parts.append(
+                f"[Attached this turn: {names}. Resolve 'this file', 'this "
+                f"lease', etc. to it.]\n"
+            )
+        else:
+            prompt_parts.append(
+                f"[Attached this turn: {names}. If the user uses a singular "
+                f"deictic ('this file') and the reference is unclear across "
+                f"these, ask which one they mean.]\n"
+            )
+
     prompt_parts.append(f"User: {user_message}")
     full_prompt = "\n".join(prompt_parts)
 
-    async with agent.run_stream(full_prompt) as result:
-        async for text in result.stream_text(delta=True):
-            yield text
+    last_reasoning = ""
+    last_prose = ""
+    last_sources_count = 0
+    try:
+        async with chat_agent.run_stream(full_prompt) as run:
+            async for partial in run.stream_output(debounce_by=None):
+                # Emit reasoning delta (streams first per Answer field order).
+                reasoning = partial.reasoning or ""
+                if reasoning and reasoning != last_reasoning:
+                    if reasoning.startswith(last_reasoning):
+                        delta = reasoning[len(last_reasoning) :]
+                        if delta:
+                            yield ("reasoning", delta)
+                    else:
+                        yield ("reasoning", reasoning)
+                    last_reasoning = reasoning
+
+                prose = partial.prose or ""
+                # Emit prose delta.
+                if prose and prose != last_prose:
+                    if prose.startswith(last_prose):
+                        delta = prose[len(last_prose) :]
+                        if delta:
+                            yield ("content", delta)
+                    else:
+                        yield ("content", prose)
+                    last_prose = prose
+
+                # Emit each newly-completed source object as it arrives.
+                current_sources = list(partial.sources or [])
+                if len(current_sources) > last_sources_count:
+                    for src in current_sources[last_sources_count:]:
+                        yield ("source", src)
+                    last_sources_count = len(current_sources)
+
+            final = await run.get_output()
+        if result_holder is not None:
+            result_holder.append(final)
+    except ValidationError as exc:
+        logger.warning(
+            "Structured output validation failed; falling back to ungrounded",
+            error=str(exc),
+        )
+        return
 
 
-_DOC_MARKER = re.compile(r"\[doc:([0-9a-fA-F]{4,})(?:\s*[,;:][^\]]*)?\]")
+# --------------------------------------------------------------------------- #
+# Marker handling — [cite:N] (current) and [doc:ID] (legacy)
+# --------------------------------------------------------------------------- #
+
+
+_CITE_MARKER = re.compile(r"\[cite:(\d+)\]")
+_LEGACY_DOC_MARKER = re.compile(r"\[doc:([0-9a-fA-F]{4,})(?:\s*[,;:][^\]]*)?\]")
 _LOCATOR = re.compile(
     r"(section\s+\d+(?:\.\d+)*|clause\s+\d+(?:\.\d+)*|page\s+\d+|paragraph\s+\d+)",
     re.IGNORECASE,
@@ -146,11 +354,13 @@ _LOCATOR = re.compile(
 
 
 def extract_sources(prose: str, documents: list[DocumentContext]) -> list[Citation]:
-    """Pull structured citations out of streamed prose.
+    """Fallback regex extraction when structured output is unavailable.
 
-    Looks for inline ``[doc:ID]`` markers and pairs each with the nearest
-    locator phrase (e.g. "Section 4.2") that appears in the same sentence,
-    falling back to the document filename. Unknown ids are dropped silently.
+    Recognises legacy ``[doc:ID]`` markers and produces page-agnostic citations
+    keyed by document filename. Used only when the structured-output path fails
+    (``ValidationError`` or model regression). New ``[cite:N]`` markers cannot
+    be hydrated without a sources array, so they are skipped here — the caller
+    will downgrade to ``ungrounded`` if no doc-id markers are recoverable.
     """
     if not prose or not documents:
         return []
@@ -159,7 +369,7 @@ def extract_sources(prose: str, documents: list[DocumentContext]) -> list[Citati
     cites: list[Citation] = []
     seen: set[tuple[str, str]] = set()
 
-    for match in _DOC_MARKER.finditer(prose):
+    for match in _LEGACY_DOC_MARKER.finditer(prose):
         doc_id = match.group(1)
         doc = known.get(doc_id)
         if doc is None:
@@ -177,11 +387,85 @@ def extract_sources(prose: str, documents: list[DocumentContext]) -> list[Citati
         if key in seen:
             continue
         seen.add(key)
-        cites.append(Citation(document_id=doc_id, label=label))
+        cites.append(Citation(document_id=doc_id, page=None, label=label, snippet=None))
 
     return cites
 
 
-def strip_citation_markers(prose: str) -> str:
-    """Remove ``[doc:ID]`` markers from prose for display."""
-    return _DOC_MARKER.sub("", prose)
+def strip_markers_for_history(prose: str) -> str:
+    """Strip both ``[cite:N]`` and legacy ``[doc:ID]`` markers from prose.
+
+    Used when re-injecting prior assistant turns into the LLM context — the
+    model should not see (and mimic) stale markers from past turns.
+    """
+    stripped = _CITE_MARKER.sub("", prose)
+    stripped = _LEGACY_DOC_MARKER.sub("", stripped)
+    return stripped
+
+
+# Back-compat alias — the router still imports this name.
+strip_citation_markers = strip_markers_for_history
+
+
+# --------------------------------------------------------------------------- #
+# Server-side citation verification
+# --------------------------------------------------------------------------- #
+
+
+def verify_citations(
+    citations: list[Citation],
+    documents: list[DocumentContext],
+) -> tuple[list[Citation], ConfidenceState]:
+    """Verify citations against loaded documents and compute confidence state.
+
+    Stripping rules:
+    - ``document_id`` not in conversation → strip.
+    - ``page`` is not None and outside ``[1, page_count]`` → strip.
+    - ``snippet`` is set but not a case-insensitive substring of
+      ``pages[page-1]`` → keep the citation but clear the snippet
+      (it likely paraphrased; the page bounds passed so the citation
+      is still anchored).
+
+    Confidence:
+    - ``ungrounded`` — no documents loaded, OR zero valid citations after
+      stripping.
+    - ``partial`` — at least one valid citation but at least one was stripped.
+    - ``grounded`` — at least one valid citation and zero stripped.
+    """
+    if not documents:
+        return [], "ungrounded"
+
+    by_id: dict[str, DocumentContext] = {d.id: d for d in documents}
+    valid: list[Citation] = []
+    stripped = 0
+
+    for citation in citations:
+        doc = by_id.get(citation.document_id)
+        if doc is None:
+            stripped += 1
+            continue
+        if citation.page is not None:
+            if citation.page < 1 or citation.page > max(doc.page_count, 0):
+                stripped += 1
+                continue
+
+        snippet = citation.snippet
+        if snippet and citation.page is not None and 0 < citation.page <= len(doc.pages):
+            page_text = doc.pages[citation.page - 1]
+            if snippet.strip().lower() not in page_text.lower():
+                snippet = None  # Bounds attest; semantic match did not.
+
+        valid.append(
+            Citation(
+                document_id=citation.document_id,
+                page=citation.page,
+                label=citation.label or "",
+                snippet=snippet,
+            )
+        )
+
+    if not valid:
+        return [], "ungrounded"
+    if stripped > 0:
+        return valid, "partial"
+    return valid, "grounded"

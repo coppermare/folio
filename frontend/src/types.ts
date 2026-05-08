@@ -8,8 +8,12 @@ export interface Conversation {
 
 export interface Citation {
 	document_id: string;
+	page?: number | null;
 	label: string;
+	snippet?: string | null;
 }
+
+export type ConfidenceState = "grounded" | "partial" | "ungrounded";
 
 export interface Message {
 	id: string;
@@ -18,6 +22,11 @@ export interface Message {
 	content: string;
 	sources_cited: number;
 	sources?: Citation[] | null;
+	// Optional: older browser tabs against a redeployed server (or legacy
+	// messages predating grounded-answers) lack this — treat absent as
+	// "grounded" so we don't render spurious red ribbons during a deploy.
+	confidence?: ConfidenceState;
+	reasoning?: string | null;
 	document_ids?: string[] | null;
 	created_at: string;
 }

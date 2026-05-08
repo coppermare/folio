@@ -1,7 +1,12 @@
 import { Files, Loader2, Menu } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import * as api from "../lib/api";
-import type { Conversation, ConversationDocument, Message } from "../types";
+import type {
+	Citation,
+	Conversation,
+	ConversationDocument,
+	Message,
+} from "../types";
 import { ChatHeader } from "./ChatHeader";
 import { ChatInput } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
@@ -18,7 +23,7 @@ function MobileEmptyHeader({
 	documentsCount: number;
 }) {
 	return (
-		<div className="flex h-10 flex-shrink-0 items-center gap-2 bg-gradient-to-b from-white to-transparent px-3 md:hidden">
+		<div className="flex h-10 flex-shrink-0 items-center gap-2 bg-gradient-to-b from-white to-transparent px-3 lg:hidden">
 			<Button
 				variant="ghost"
 				size="icon"
@@ -55,6 +60,8 @@ interface ChatWindowProps {
 	error: string | null;
 	streaming: boolean;
 	streamingContent: string;
+	streamingSources: Citation[];
+	streamingReasoning: string;
 	hasDocuments: boolean;
 	conversationId: string | null;
 	conversation: Conversation | null;
@@ -80,6 +87,8 @@ export function ChatWindow({
 	error,
 	streaming,
 	streamingContent,
+	streamingSources,
+	streamingReasoning,
 	hasDocuments,
 	conversationId,
 	conversation,
@@ -141,7 +150,7 @@ export function ChatWindow({
 	const isEmpty = !loading && messages.length === 0 && !streaming;
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col bg-white">
+		<div className="flex min-w-0 flex-1 flex-col bg-white lg:min-w-[360px]">
 			{conversation ? (
 				<ChatHeader
 					conversation={conversation}
@@ -179,7 +188,7 @@ export function ChatWindow({
 						ref={scrollRef}
 						className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-4"
 					>
-						<div className="mx-auto max-w-2xl space-y-1">
+						<div className="mx-auto max-w-3xl space-y-1">
 							{messages.map((message) => (
 								<MessageBubble
 									key={message.id}
@@ -191,6 +200,8 @@ export function ChatWindow({
 								<StreamingBubble
 									content={streamingContent}
 									documents={documents}
+									sources={streamingSources}
+									reasoning={streamingReasoning}
 								/>
 							)}
 						</div>
