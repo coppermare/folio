@@ -1,4 +1,4 @@
-// K-117 inline citation pill — same visual as FileChip (fully rounded, neutral
+// Inline citation pill — same visual as FileChip (fully rounded, neutral
 // palette) so citations feel native to the rest of the chat UI. Hovering opens
 // a minimal popover: clickable filename (hover-underlined link), page +
 // section locator, optional snippet as plain subtext.

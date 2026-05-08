@@ -73,8 +73,8 @@ def unwrap_sources(
     """Read ``Message.sources`` JSONB into (confidence, citations, reasoning).
 
     Two storage shapes are supported:
-    - **New (K-117):** ``{"confidence": "...", "citations": [...], "reasoning": "..."}``
-    - **Legacy (pre-K-117 / K-116):** bare list ``[{document_id, label}]`` —
+    - **Current:** ``{"confidence": "...", "citations": [...], "reasoning": "..."}``
+    - **Legacy:** bare list ``[{document_id, label}]`` —
       confidence derived from count (empty → ungrounded, non-empty → grounded);
       reasoning unavailable.
     """
@@ -344,8 +344,8 @@ async def send_message(
             await save_session.commit()
             await save_session.refresh(assistant_message)
 
-            # K-117 success telemetry — measure whether the trust intervention
-            # moves the 16.2% ungrounded number across the beta cohort.
+            # Trust-intervention telemetry — measure whether the prompt
+            # contract moves the 16.2% ungrounded number across the cohort.
             logger.info(
                 "answer_confidence",
                 confidence=confidence,

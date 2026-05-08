@@ -34,25 +34,26 @@ Trust won on three axes simultaneously: most quotes, hardest data signal, strate
 
 **Layer 1 — Inline citation pills.** Compact pill at the position of each cited claim (`§4.2` or `p.12`). Click/hover opens a popover card with filename + page + snippet + Jump-to-page button. Modeled on [AI SDK Elements' `InlineCitation`](https://elements.ai-sdk.dev/components/inline-citation). Reuses the existing `FileChip` for the doc-level "Drew on:" attribution row at the message header.
 
-**Layer 2 — Confidence states.**
+**Layer 2 — Refuse-when-ungrounded prompt contract** (replaces the originally-planned UI confidence ribbon — see "Reframing Layer 2" below).
 
-| State | Trigger | Treatment |
-|---|---|---|
-| Grounded | ≥1 verified citation, zero stripped | No ribbon — pills *are* the indicator |
-| Partial | ≥1 valid citation **and** at least one was stripped (failed verification) | Amber bar with warning-triangle icon: *"Some claims in this answer aren't backed by your documents."* |
-| Ungrounded | Zero valid citations (or no documents loaded) | Red bar with shield-x icon: *"This answer isn't backed by your documents. Verify before relying on it."* |
+The model itself is the trust signal. The system prompt's **HONESTY RULES** section requires the model to refuse rather than guess when grounding fails: explicit "I don't see X in the loaded documents" templates, plain disclosure when text extraction failed, partial-coverage acknowledgement, no-fabrication enforcement, and a "Beyond the documents:" prefix when speculation is unavoidable. The signal arrives *in the prose itself*, in the lawyer's natural reading flow, rather than as a warning ribbon overlaid on confident-sounding text.
 
-Ribbon is suppressed when the conversation has zero documents — the warning is meaningless without docs to check against. Critically NOT suppressed when docs exist but none were cited; that's exactly when ungrounded should fire loudest.
+Server-side `verify_citations` (`services/llm.py:371`) remains as a silent safety net: it strips hallucinated cites (unknown doc_id, out-of-range page, snippet not on cited page) and computes a `confidence` value (`grounded` / `partial` / `ungrounded`) that flows through the SSE pipeline and is logged via the `answer_confidence` telemetry event. **No ribbon is rendered.** The plumbing stays so we can measure whether the prompt change moves the 16.2% number — telemetry without UI.
 
 **Layer 3 — "Show your work" panel.** Deferred to future work. Costs the most code for the smallest delta over Layer 1; would have pushed beyond the 90-min budget.
 
-### The contestable call: silent-when-good vs always-show-state
+### Reframing Layer 2: why a UI ribbon was rejected
 
-**Chose silent-when-good.** Pills *are* the positive signal; ribbons reserved for risk. Trains the eye to read ribbons as warnings.
+The original design specified amber (`partial`) and red (`ungrounded`) ribbons with verbatim copy. That design was reconsidered during pre-PR QA and replaced with the prompt-level approach above. The reasoning:
 
-**Counter-argument:** always-show-state (e.g. green badge on every grounded answer) is closer to Partner A's literal *"I'd pay double the licence fee if the AI would just tell me when it's not sure"* request — explicit positive feedback. But it devalues the signal — every answer screams. After three weeks of beta noise, "grounded" badges become wallpaper.
+- **Ribbons are a patch on a behavior we should fix upstream.** A red ribbon says "the model just answered without grounding" — but the right product response is to make the model not answer ungroundedly in the first place. Tightening the prompt (refuse-when-ungrounded, no-fabrication, partial-coverage acknowledgement) addresses the cause; ribbons paper over the symptom.
+- **Ribbons train mistrust.** In the lawyer persona, a red bar appearing on ~16% of answers reads as "this tool is unreliable." It accelerates the churn the feature was meant to prevent (Senior Associate's *"she stopped using it"* in customer_feedback.md). A model that says *"I don't see a break clause in this lease — the term provisions are at §3 but no early-termination right is granted"* sounds like a careful junior associate; the same answer with a red ribbon on top sounds like a tool warning the user not to trust it.
+- **The two failure modes the ribbon would have caught are absorbed into the prose:**
+  - *Ungrounded answer with docs loaded* → model refuses with a templated "I don't see X" sentence, citing what is covered.
+  - *Partial (server stripped a cite)* → still rare in practice; remaining cases are silent at the UI layer and visible in telemetry. If `partial` rates climb, that's a prompt-or-retrieval signal, not a UX one.
+- **Reliability beats transparency in this persona.** Partner A's quote — *"I'd pay double the licence fee if the AI would just tell me when it's not sure"* — was originally read as a request for an explicit UI signal. On reflection, the lawyer's actual ask is honesty about uncertainty; the model saying so in plain text answers that ask more directly than a coloured bar.
 
-This is the single most contestable decision in the submission. If a reviewer disagrees, it's the right disagreement to have — documented here so the disagreement is deliberate, not accidental.
+This is the single most contestable decision in the submission. If a reviewer disagrees, the disagreement is between **honesty-via-prompt-contract** (chosen) and **honesty-via-UI-ribbon** (originally specified). The prompt approach removes ~80 LOC of UI work, removes the "this tool keeps warning me" affordance, and shifts the trust burden to where it belongs — onto the model's own behavior, measured via the telemetry that already exists.
 
 ### Technical decisions
 
@@ -85,7 +86,7 @@ This is the single most contestable decision in the submission. If a reviewer di
 
 ### Accessibility
 
-`ConfidenceRibbon` uses **icon + color** (warning triangle / shield-x — not color alone, for colorblind safety) and `role="alert"` + `aria-live="polite"` so screen readers announce when the ribbon appears post-stream. Tailwind palette only — no new tokens.
+With the ribbon dropped (see "Reframing Layer 2"), the trust signal is now the model's own prose. That means the existing message-bubble a11y carries it for free: screen readers read the model's "I don't see X in the loaded documents" sentence in natural reading order, no `aria-live` overlay required. Citation pills retain their button semantics + keyboard activation from `InlineCitation.tsx`.
 
 ### Things explicitly cut from v1
 

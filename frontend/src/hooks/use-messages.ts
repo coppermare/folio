@@ -191,7 +191,7 @@ export function useMessages(conversationId: string | null) {
 				// Intentional: do NOT refetch from the server here. The canonical
 				// `message` SSE event already carries the persisted Message; an
 				// extra `fetchMessages` would force a second re-render of the
-				// just-swapped bubble and violate K-117's "without flicker"
+				// just-swapped bubble and violate the "without flicker"
 				// criterion.
 			} catch (err) {
 				if (err instanceof DOMException && err.name === "AbortError") return;

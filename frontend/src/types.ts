@@ -23,8 +23,8 @@ export interface Message {
 	sources_cited: number;
 	sources?: Citation[] | null;
 	// Optional: older browser tabs against a redeployed server (or legacy
-	// messages predating K-117) lack this — treat absent as "grounded" so we
-	// don't render spurious red ribbons during a deploy.
+	// messages predating grounded-answers) lack this — treat absent as
+	// "grounded" so we don't render spurious red ribbons during a deploy.
 	confidence?: ConfidenceState;
 	reasoning?: string | null;
 	document_ids?: string[] | null;
