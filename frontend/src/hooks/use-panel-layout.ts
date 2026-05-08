@@ -47,7 +47,9 @@ export function usePanelLayout() {
 			const dynamicMax = window.innerWidth - 250 - 360;
 			if (dynamicMax < MIN_WIDTH) {
 				// Not enough room — collapse so the chat window stays usable
-				setLayout((prev) => (prev.collapsed ? prev : { ...prev, collapsed: true }));
+				setLayout((prev) =>
+					prev.collapsed ? prev : { ...prev, collapsed: true },
+				);
 			} else {
 				setLayout((prev) => ({
 					...prev,
