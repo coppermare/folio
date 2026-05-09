@@ -1,5 +1,11 @@
 import { Files, Loader2, Menu } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import {
+	type DragEvent,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import * as api from "../lib/api";
 import type {
 	Citation,
@@ -8,10 +14,14 @@ import type {
 	Message,
 } from "../types";
 import { ChatHeader } from "./ChatHeader";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble, StreamingBubble } from "./MessageBubble";
 import { Button } from "./ui/button";
+
+function dragHasFiles(e: DragEvent<HTMLDivElement>): boolean {
+	return Array.from(e.dataTransfer.types ?? []).includes("Files");
+}
 
 function MobileEmptyHeader({
 	onOpenSidebar,
@@ -106,6 +116,48 @@ export function ChatWindow({
 	onOpenWorkspace,
 }: ChatWindowProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<ChatInputHandle>(null);
+	const dragCounter = useRef(0);
+	const [isDragging, setIsDragging] = useState(false);
+
+	const handleDragEnter = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!dragHasFiles(e)) return;
+			e.preventDefault();
+			dragCounter.current += 1;
+			if (!streaming) setIsDragging(true);
+		},
+		[streaming],
+	);
+
+	const handleDragOver = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!dragHasFiles(e)) return;
+			e.preventDefault();
+			e.dataTransfer.dropEffect = streaming ? "none" : "copy";
+		},
+		[streaming],
+	);
+
+	const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+		if (!dragHasFiles(e)) return;
+		e.preventDefault();
+		dragCounter.current = Math.max(0, dragCounter.current - 1);
+		if (dragCounter.current === 0) setIsDragging(false);
+	}, []);
+
+	const handleDrop = useCallback(
+		(e: DragEvent<HTMLDivElement>) => {
+			if (!dragHasFiles(e)) return;
+			e.preventDefault();
+			dragCounter.current = 0;
+			setIsDragging(false);
+			if (streaming) return;
+			const files = Array.from(e.dataTransfer.files ?? []);
+			if (files.length > 0) inputRef.current?.addFiles(files);
+		},
+		[streaming],
+	);
 
 	const messagesLength = messages.length;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: messages and streamingContent are intentional triggers for auto-scroll
@@ -152,7 +204,22 @@ export function ChatWindow({
 	const isEmpty = !loading && messages.length === 0 && !streaming;
 
 	return (
-		<div className="flex min-w-0 flex-1 flex-col bg-white lg:min-w-[360px]">
+		<div
+			className="relative flex min-w-0 flex-1 flex-col bg-white lg:min-w-[360px]"
+			onDragEnter={handleDragEnter}
+			onDragOver={handleDragOver}
+			onDragLeave={handleDragLeave}
+			onDrop={handleDrop}
+		>
+			{isDragging && (
+				<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-white/85">
+					<div className="rounded-card border-2 border-dashed border-neutral-400 px-6 py-4">
+						<span className="text-sm font-medium text-neutral-700">
+							Drop files to attach
+						</span>
+					</div>
+				</div>
+			)}
 			{conversation ? (
 				<ChatHeader
 					conversation={conversation}
@@ -212,6 +279,7 @@ export function ChatWindow({
 			)}
 
 			<ChatInput
+				ref={inputRef}
 				onSend={handleSend}
 				disabled={streaming}
 				availableDocuments={documents}
