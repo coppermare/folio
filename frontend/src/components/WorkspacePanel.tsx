@@ -5,6 +5,7 @@ import {
 	PanelLeftOpen,
 	PanelRightOpen,
 	Plus,
+	Upload,
 	X,
 } from "lucide-react";
 import {
@@ -61,6 +62,44 @@ export function WorkspacePanel({
 	const { openTabIds, activeTab, openDoc, closeDoc, setActiveTab, focusFiles } =
 		useWorkspaceTabs(conversationId, docIds);
 	const [dragging, setDragging] = useState(false);
+	const dragCounter = useRef(0);
+	const [fileDragging, setFileDragging] = useState(false);
+
+	const handlePanelDragEnter = useCallback((e: DragEvent) => {
+		if (!Array.from(e.dataTransfer.types ?? []).includes("Files")) return;
+		e.preventDefault();
+		dragCounter.current += 1;
+		setFileDragging(true);
+	}, []);
+
+	const handlePanelDragOver = useCallback((e: DragEvent) => {
+		if (!Array.from(e.dataTransfer.types ?? []).includes("Files")) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = "copy";
+	}, []);
+
+	const handlePanelDragLeave = useCallback((e: DragEvent) => {
+		if (!Array.from(e.dataTransfer.types ?? []).includes("Files")) return;
+		e.preventDefault();
+		dragCounter.current = Math.max(0, dragCounter.current - 1);
+		if (dragCounter.current === 0) setFileDragging(false);
+	}, []);
+
+	const handlePanelDrop = useCallback(
+		(e: DragEvent) => {
+			if (!Array.from(e.dataTransfer.types ?? []).includes("Files")) return;
+			e.preventDefault();
+			dragCounter.current = 0;
+			setFileDragging(false);
+			const files = Array.from(e.dataTransfer.files ?? []).filter((f) =>
+				isSupportedUploadFile(f.name),
+			);
+			if (files.length === 0) return;
+			setActiveTab("files");
+			void onUpload(files);
+		},
+		[onUpload, setActiveTab],
+	);
 
 	// Listen for chip-driven open requests from anywhere in the app. Auto-
 	// surface the workspace if it's currently collapsed/hidden — clicking a
@@ -111,7 +150,7 @@ export function WorkspacePanel({
 								variant="ghost"
 								size="iconSm"
 								className="text-neutral-500"
-								onClick={toggleCollapsed}
+								onClick={expandToReadableWidth}
 								aria-label="Expand workspace"
 							>
 								<PanelRightOpen className="h-4 w-4" />
@@ -149,7 +188,22 @@ export function WorkspacePanel({
 					onClick={onMobileClose}
 				/>
 			)}
-			<div style={containerStyle} className={containerClass}>
+			<div
+				style={containerStyle}
+				className={containerClass}
+				onDragEnter={handlePanelDragEnter}
+				onDragOver={handlePanelDragOver}
+				onDragLeave={handlePanelDragLeave}
+				onDrop={handlePanelDrop}
+			>
+				{fileDragging && (
+					<div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-white/85">
+						<Upload className="h-6 w-6 text-neutral-500" />
+						<span className="text-sm font-medium text-neutral-700">
+							Drop files to attach
+						</span>
+					</div>
+				)}
 				{!isMobile && (
 					<button
 						type="button"
@@ -257,6 +311,8 @@ export function WorkspacePanel({
 							}}
 							onOpen={openDoc}
 							activeTab={activeTab}
+							panelWidth={isMobile ? undefined : width}
+							dragHovered={fileDragging}
 						/>
 					</TabsContent>
 
@@ -293,6 +349,8 @@ interface FilesTabBodyProps {
 	onRemove: (id: string) => Promise<void> | void;
 	onOpen: (id: string) => void;
 	activeTab: string;
+	panelWidth?: number;
+	dragHovered?: boolean;
 }
 
 function FilesTabBody({
@@ -303,9 +361,10 @@ function FilesTabBody({
 	onRemove,
 	onOpen,
 	activeTab,
+	panelWidth,
+	dragHovered = false,
 }: FilesTabBodyProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const [dragOver, setDragOver] = useState(false);
 
 	const handleFiles = (fileList: FileList | null) => {
 		if (!fileList) return;
@@ -315,33 +374,17 @@ function FilesTabBody({
 		if (files.length > 0) onUpload(files);
 	};
 
-	const onDragOver = (e: DragEvent) => {
-		e.preventDefault();
-		setDragOver(true);
-	};
-	const onDragLeave = (e: DragEvent) => {
-		e.preventDefault();
-		setDragOver(false);
-	};
-	const onDrop = (e: DragEvent) => {
-		e.preventDefault();
-		setDragOver(false);
-		handleFiles(e.dataTransfer.files);
-	};
-
-	if (!conversationId) {
-		return (
-			<div className="flex flex-1 items-center justify-center p-6 text-sm text-neutral-400">
-				Select or create a conversation to start uploading files.
-			</div>
-		);
-	}
+	const isNarrow = panelWidth !== undefined && panelWidth < 320;
+	const dropCopy = isNarrow
+		? "Drop or click to upload"
+		: "Drop files here or click to upload";
+	const headerCopy = conversationId ? "Files in this conversation" : "Files";
 
 	return (
 		<div className="flex flex-1 flex-col">
 			<div className="flex items-center justify-between px-3 py-2">
-				<span className="text-xs font-medium text-neutral-500">
-					Files in this conversation
+				<span className="truncate text-xs font-medium text-neutral-500">
+					{headerCopy}
 				</span>
 				<Button
 					variant="ghost"
@@ -366,27 +409,22 @@ function FilesTabBody({
 				/>
 			</div>
 
-			<div
-				className="flex-1 overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutral-200 [&::-webkit-scrollbar]:w-1.5"
-				onDragOver={onDragOver}
-				onDragLeave={onDragLeave}
-				onDrop={onDrop}
-			>
+			<div className="flex-1 overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutral-200 [&::-webkit-scrollbar]:w-1.5">
 				{documents.length === 0 ? (
-					<button
-						type="button"
-						onClick={() => fileInputRef.current?.click()}
-						className={`m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card text-center transition-colors ${
-							dragOver ? "bg-neutral-100" : "bg-neutral-50 hover:bg-neutral-100"
-						}`}
-					>
-						<FilePlus className="h-5 w-5 text-neutral-400" />
-						<p className="text-sm font-medium text-neutral-600">
-							Drop files here or click to upload
-						</p>
-					</button>
+					dragHovered ? null : (
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							className="m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card bg-neutral-50 px-3 text-center transition-colors hover:bg-neutral-100"
+						>
+							<FilePlus className="h-5 w-5 flex-shrink-0 text-neutral-400" />
+							<p className="text-balance text-sm font-medium text-neutral-600">
+								{dropCopy}
+							</p>
+						</button>
+					)
 				) : (
-					<div className={`p-2 ${dragOver ? "bg-neutral-50" : ""}`}>
+					<div className="p-2">
 						{documents.map((doc) => (
 							<FileRow
 								key={doc.id}

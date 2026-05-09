@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Document as PDFDocument, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -201,22 +201,24 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 					<span>
 						Page {currentPage} of {numPages}
 					</span>
-					<div className="flex items-center gap-1">
+					<div className="inline-flex items-center gap-1">
 						<button
 							type="button"
-							className="rounded px-2 py-0.5 hover:bg-neutral-100 disabled:opacity-40"
-							disabled={currentPage <= 1}
-							onClick={() => handleJump(Math.max(1, currentPage - 1))}
-						>
-							Prev
-						</button>
-						<button
-							type="button"
-							className="rounded px-2 py-0.5 hover:bg-neutral-100 disabled:opacity-40"
+							aria-label="Next page"
+							className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
 							disabled={currentPage >= numPages}
 							onClick={() => handleJump(Math.min(numPages, currentPage + 1))}
 						>
-							Next
+							<ArrowDown className="h-3.5 w-3.5" />
+						</button>
+						<button
+							type="button"
+							aria-label="Previous page"
+							className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
+							disabled={currentPage <= 1}
+							onClick={() => handleJump(Math.max(1, currentPage - 1))}
+						>
+							<ArrowUp className="h-3.5 w-3.5" />
 						</button>
 					</div>
 				</div>

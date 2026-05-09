@@ -29,6 +29,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 				<DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 				<DialogPrimitive.Content
 					className="fixed left-[50%] top-[50%] z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col overflow-y-auto overscroll-contain rounded-card border border-neutral-200 bg-white shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+					onOpenAutoFocus={(e) => e.preventDefault()}
 					onPointerDownOutside={(e) => e.preventDefault()}
 					onEscapeKeyDown={(e) => {
 						e.preventDefault();
@@ -45,8 +46,17 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 
 					<HeroImage step={step} />
 
-					{step === 0 ? (
-						<div>
+					{/* Stack both step bodies in a single grid cell so the modal
+					 * always sizes to the taller step — keeps dimensions stable
+					 * across the step transition. Inactive step fades out. */}
+					<div className="relative grid [&>*]:col-start-1 [&>*]:row-start-1">
+						<div
+							aria-hidden={step !== 0}
+							className={cn(
+								"transition-opacity duration-200",
+								step === 0 ? "opacity-100" : "pointer-events-none opacity-0",
+							)}
+						>
 							<div className="px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
 								<h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
 									Welcome to Folio.
@@ -73,8 +83,14 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 								</div>
 							</div>
 						</div>
-					) : (
-						<form onSubmit={handleSubmit}>
+						<form
+							onSubmit={handleSubmit}
+							aria-hidden={step !== 1}
+							className={cn(
+								"transition-opacity duration-200",
+								step === 1 ? "opacity-100" : "pointer-events-none opacity-0",
+							)}
+						>
 							<div className="px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
 								<h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
 									What should we call you?
@@ -88,6 +104,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 									value={name}
 									onChange={(e) => setName(e.target.value)}
 									placeholder="Your name"
+									tabIndex={step === 1 ? 0 : -1}
 									className="mt-5 w-full rounded-control border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400"
 									maxLength={60}
 								/>
@@ -99,14 +116,17 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 										type="button"
 										variant="ghost"
 										onClick={() => onComplete(null)}
+										tabIndex={step === 1 ? 0 : -1}
 									>
 										Skip
 									</Button>
-									<Button type="submit">Get started</Button>
+									<Button type="submit" tabIndex={step === 1 ? 0 : -1}>
+										Get started
+									</Button>
 								</div>
 							</div>
 						</form>
-					)}
+					</div>
 				</DialogPrimitive.Content>
 			</DialogPrimitive.Portal>
 		</DialogPrimitive.Root>

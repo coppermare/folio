@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import FileResponse
 
+from takehome.db.models import Document
 from takehome.db.session import get_session
 from takehome.services.conversation import get_conversation
 from takehome.services.document import (
@@ -45,7 +46,7 @@ class DocumentOut(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-def _to_out(doc) -> DocumentOut:
+def _to_out(doc: Document) -> DocumentOut:
     return DocumentOut(
         id=doc.id,
         conversation_id=doc.conversation_id,
