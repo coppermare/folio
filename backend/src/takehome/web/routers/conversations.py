@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from takehome.db.models import Conversation, Document
 from takehome.db.session import get_session
 from takehome.services.conversation import (
     create_conversation,
@@ -62,7 +63,7 @@ class ConversationUpdate(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-def _doc_info(doc) -> DocumentInfo:
+def _doc_info(doc: Document) -> DocumentInfo:
     return DocumentInfo(
         id=doc.id,
         filename=doc.filename,
@@ -72,7 +73,7 @@ def _doc_info(doc) -> DocumentInfo:
     )
 
 
-def _detail(conversation) -> ConversationDetail:
+def _detail(conversation: Conversation) -> ConversationDetail:
     docs = sorted(conversation.documents, key=lambda d: d.uploaded_at)
     return ConversationDetail(
         id=conversation.id,

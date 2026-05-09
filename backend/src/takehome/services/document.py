@@ -4,8 +4,9 @@ import hashlib
 import os
 import uuid
 from dataclasses import dataclass
+from typing import Any, cast
 
-import fitz  # PyMuPDF
+import fitz  # type: ignore[import-untyped]  # PyMuPDF has no type stubs
 import structlog
 from docx import Document as DocxDocument
 from fastapi import UploadFile
@@ -125,11 +126,11 @@ def _extract_text(file_path: str, filename: str) -> tuple[str, int]:
 
 def _extract_pdf(file_path: str) -> tuple[str, int]:
     doc = fitz.open(file_path)
-    page_count = len(doc)
+    page_count: int = len(doc)
     pages: list[str] = []
     for page_num in range(page_count):
         page = doc[page_num]
-        text = page.get_text()  # type: ignore[union-attr]
+        text = cast(str, page.get_text())  # pyright: ignore[reportUnknownMemberType]
         if text.strip():
             pages.append(f"--- Page {page_num + 1} ---\n{text}")
     doc.close()
@@ -141,25 +142,33 @@ def _extract_markdown(file_path: str) -> str:
         return f.read()
 
 
+_DOCX_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _docx_element_text(element: Any) -> str:
+    """Concatenate all <w:t> text within an lxml element."""
+    return "".join(
+        cast(str, node.text) or ""
+        for node in element.iter()
+        if cast(str, node.tag).endswith("}t")
+    )
+
+
 def _extract_docx(file_path: str) -> str:
     """Walk paragraphs and tables in document order, preserving reading flow."""
     docx = DocxDocument(file_path)
+    body = cast(Any, docx.element).body
     parts: list[str] = []
-    for block in docx.element.body.iterchildren():
-        tag = block.tag.split("}")[-1]
+    for block in body.iterchildren():
+        tag = cast(str, block.tag).split("}")[-1]
         if tag == "p":
-            text = "".join(node.text or "" for node in block.iter() if node.tag.endswith("}t"))
+            text = _docx_element_text(block)
             if text.strip():
                 parts.append(text)
         elif tag == "tbl":
-            for row in block.iter(
-                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"
-            ):
+            for row in block.iter(f"{_DOCX_NS}tr"):
                 cells = [
-                    "".join(node.text or "" for node in cell.iter() if node.tag.endswith("}t"))
-                    for cell in row.iter(
-                        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"
-                    )
+                    _docx_element_text(cell) for cell in row.iter(f"{_DOCX_NS}tc")
                 ]
                 parts.append("\t".join(cells))
     return "\n".join(parts)
