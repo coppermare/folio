@@ -74,23 +74,26 @@ A conversation has many documents and many messages. Multiple docs per conversat
 
 `services/llm.py` defines the typed citation contract. It defines:
 
-- `Citation { document_id, label }` — one cited reference.
-- `Answer { prose, sources: list[Citation] }` — the structured response shape.
-- `chat_with_documents(user_message, documents, history)` — async iterator yielding prose chunks. Builds the prompt with one `<doc id="…" name="…">…</doc>` block per loaded document and instructs the model to emit `[doc:ID]` markers inline.
-- `extract_sources(prose, documents)` — regex-parses inline `[doc:ID]` markers into `Citation` records.
-- `strip_citation_markers(prose)` — strips the markers for storage/display.
+- `Citation { document_id, page?, label, snippet? }` — one cited reference.
+- `Answer { reasoning, sources: list[Citation], prose }` — the structured response shape. Field order matters for streaming UX (reasoning surfaces first, then sources, then prose).
+- `chat_with_documents(user_message, documents, history)` — async iterator over a structured stream. Builds the prompt with one `<doc id="…" name="…">…</doc>` block per loaded document and instructs the model to emit `[cite:N]` markers inline, where `N` is a 1-indexed position into `Answer.sources`.
+- `extract_sources(prose, documents)` — regex fallback for the unstructured-output path; recognizes the legacy `[doc:ID]` form (the canonical `[cite:N]` form needs the typed `sources` array, which the structured path provides directly).
+- `strip_markers_for_history(prose)` — strips both `[cite:N]` and legacy `[doc:ID]` markers before re-feeding history to the LLM and for display.
 
-Prose streams token-by-token (fast UX); citations are extracted post-stream by regex. The current implementation uses true `output_type=Answer` structured streaming. **Don't break the `Citation` / `Answer` contract.**
+Prose streams token-by-token (fast UX). The structured path is the primary route — `answer.sources` is authoritative — and `[cite:N]` is just a positional reference into it. The regex fallback exists only for the rare unstructured-output case. **Don't break the `Citation` / `Answer` contract.**
 
 ### Streaming protocol
 
-`POST /api/conversations/{id}/messages` returns SSE with three event types:
+`POST /api/conversations/{id}/messages` returns SSE with these event types (in roughly this order):
 
-- `{"type":"content","content":"<delta>"}` — prose chunk (may contain raw `[doc:ID]` markers).
+- `{"type":"reasoning","delta":"<chunk>"}` — chain-of-thought tokens.
+- `{"type":"content","content":"<delta>"}` — prose chunk (may contain raw `[cite:N]` markers).
+- `{"type":"source_preview","source":{...}}` — early citation hint; may interleave with `content`.
 - `{"type":"message","message":{...}}` — final canonical message after streaming ends; `content` has the markers stripped.
-- `{"type":"done","sources_cited":N,"sources":[...]}` — terminal event with the typed citations.
+- `{"type":"citations","sources":[...]}` — final typed citations.
+- `{"type":"done","sources_cited":N}` — terminal event.
 
-The frontend's `useMessages` accumulates `content` chunks into `streamingContent`, then replaces the streaming bubble with the canonical message. `MessageBubble` strips markers client-side too, so brief flashes of `[doc:ID]` mid-stream are also cleaned in display.
+The frontend's `useMessages` accumulates `content` chunks into `streamingContent`, then replaces the streaming bubble with the canonical message. Brief flashes of `[cite:N]` mid-stream are acceptable; the canonical message has them stripped server-side.
 
 ### Frontend
 

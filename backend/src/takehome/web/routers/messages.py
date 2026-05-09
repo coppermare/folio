@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
 from takehome.db.models import Message
-from takehome.db.session import get_session
+from takehome.db.session import async_session, get_session
 from takehome.services.conversation import get_conversation, update_conversation
 from takehome.services.document import (
     get_documents_by_ids,
@@ -325,9 +325,7 @@ async def send_message(
 
         sources_payload = _wrap_sources(confidence, verified, reasoning_text)
 
-        from takehome.db.session import async_session as session_factory
-
-        async with session_factory() as save_session:
+        async with async_session() as save_session:
             assistant_message = Message(
                 conversation_id=conversation_id,
                 role="assistant",
