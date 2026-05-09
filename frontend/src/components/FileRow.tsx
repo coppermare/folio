@@ -75,10 +75,12 @@ export function FileRow({
 					<p className="truncate text-sm font-medium text-neutral-800">
 						{document.filename}
 					</p>
-					<p className="text-xs text-neutral-400">
-						{document.page_count} page
-						{document.page_count !== 1 ? "s" : ""}
-					</p>
+					{document.filename.toLowerCase().endsWith(".pdf") && (
+						<p className="text-xs text-neutral-400">
+							{document.page_count} page
+							{document.page_count !== 1 ? "s" : ""}
+						</p>
+					)}
 				</div>
 			</button>
 

@@ -312,6 +312,7 @@ export function WorkspacePanel({
 							onOpen={openDoc}
 							activeTab={activeTab}
 							panelWidth={isMobile ? undefined : width}
+							dragHovered={fileDragging}
 						/>
 					</TabsContent>
 
@@ -349,6 +350,7 @@ interface FilesTabBodyProps {
 	onOpen: (id: string) => void;
 	activeTab: string;
 	panelWidth?: number;
+	dragHovered?: boolean;
 }
 
 function FilesTabBody({
@@ -360,6 +362,7 @@ function FilesTabBody({
 	onOpen,
 	activeTab,
 	panelWidth,
+	dragHovered = false,
 }: FilesTabBodyProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -408,16 +411,18 @@ function FilesTabBody({
 
 			<div className="flex-1 overflow-y-auto [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-neutral-200 [&::-webkit-scrollbar]:w-1.5">
 				{documents.length === 0 ? (
-					<button
-						type="button"
-						onClick={() => fileInputRef.current?.click()}
-						className="m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card bg-neutral-50 px-3 text-center transition-colors hover:bg-neutral-100"
-					>
-						<FilePlus className="h-5 w-5 flex-shrink-0 text-neutral-400" />
-						<p className="text-balance text-sm font-medium text-neutral-600">
-							{dropCopy}
-						</p>
-					</button>
+					dragHovered ? null : (
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							className="m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card bg-neutral-50 px-3 text-center transition-colors hover:bg-neutral-100"
+						>
+							<FilePlus className="h-5 w-5 flex-shrink-0 text-neutral-400" />
+							<p className="text-balance text-sm font-medium text-neutral-600">
+								{dropCopy}
+							</p>
+						</button>
+					)
 				) : (
 					<div className="p-2">
 						{documents.map((doc) => (

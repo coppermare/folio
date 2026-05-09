@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { emitToast } from "../components/Toaster";
 import * as api from "../lib/api";
 import type { ConversationDocument } from "../types";
 
@@ -40,6 +41,11 @@ export function useDocuments(conversationId: string | null) {
 					uploaded_at: doc.uploaded_at,
 					extraction_failed: doc.extraction_failed,
 				};
+				if (result.duplicate) {
+					emitToast(
+						`"${doc.filename}" is already attached to this conversation.`,
+					);
+				}
 				setDocuments((prev) =>
 					result.duplicate || prev.some((d) => d.id === summary.id)
 						? prev

@@ -3,6 +3,7 @@ import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { ProjectsPage } from "./components/ProjectsPage";
+import { Toaster } from "./components/Toaster";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
@@ -244,6 +245,7 @@ export default function App() {
 				open={!hasCompletedOnboarding}
 				onComplete={handleOnboardingComplete}
 			/>
+			<Toaster />
 		</TooltipProvider>
 	);
 }
