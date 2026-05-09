@@ -152,7 +152,9 @@ def _extract_docx(file_path: str) -> str:
             if text.strip():
                 parts.append(text)
         elif tag == "tbl":
-            for row in block.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"):
+            for row in block.iter(
+                "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"
+            ):
                 cells = [
                     "".join(node.text or "" for node in cell.iter() if node.tag.endswith("}t"))
                     for cell in row.iter(

@@ -1,8 +1,28 @@
-# folio
+<p align="center">
+  <img src="frontend/public/hero.jpg" alt="Folio" width="100%" />
+</p>
 
-Document Q&A for commercial real estate lawyers. Upload legal documents (leases, title reports, environmental assessments) into a conversation and ask questions about them; the AI answers grounded in the documents and cites which ones it used.
+# Folio
 
-A single conversation can hold many documents.
+Document Q&A for commercial real estate lawyers. Upload legal documents — leases, title reports, environmental assessments — into a conversation and ask questions about them. The AI answers grounded in those documents and cites which pages it pulled from, so a lawyer can verify every claim in one click.
+
+The full reasoning behind each design decision lives in [DECISIONS.md](DECISIONS.md).
+
+## What it does
+
+- **Multi-document conversations.** Drag-and-drop a PDF, DOCX, or Markdown file anywhere in the chat. Files are saved to the session and listed in a right-side workspace panel where they open in browser-like tabs. `@`-mention any uploaded document to bring it into focus mid-thread.
+- **Grounded answers with click-to-jump citations.** The model is prompted to refuse rather than guess when grounding fails, and to say plainly when an answer isn't in the loaded documents. Every grounded claim carries an inline citation pill; clicking it jumps the workspace panel straight to the cited page.
+- **Live agent reasoning.** A short reasoning summary streams above each answer so the user can see what the agent is doing before the answer arrives.
+- **Multi-format rendering.** PDFs, Word documents, and Markdown all render in-browser with their original formatting preserved.
+- **Mobile-responsive.** Works on a phone for quick lookups between meetings.
+
+## Tech
+
+- **Frontend:** Vite + React + TypeScript, Tailwind, shadcn/Radix UI
+- **Backend:** FastAPI (Python 3.12), SQLAlchemy, Alembic, PydanticAI
+- **Model:** Claude Sonnet for chat, Haiku for short utility tasks
+- **Storage:** PostgreSQL
+- **Runtime:** Docker Compose
 
 ---
 

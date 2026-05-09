@@ -6,6 +6,7 @@ import {
 	type KeyboardEvent,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -25,7 +26,10 @@ import {
 	type PendingFile,
 	type ReferenceChip,
 } from "./ChatAttachments";
-import { FileMentionPopover } from "./FileMentionPopover";
+import {
+	FileMentionPopover,
+	filterMentionCandidates,
+} from "./FileMentionPopover";
 import { Button } from "./ui/button";
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
@@ -56,6 +60,7 @@ export function ChatInput({
 		open: false,
 		query: "",
 	});
+	const [mentionActive, setMentionActive] = useState(0);
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +209,22 @@ export function ChatInput({
 
 	const handleSendRef = useRef<() => Promise<void>>(async () => {});
 
+	const mentionCandidates = useMemo(
+		() =>
+			mention.open
+				? filterMentionCandidates(
+						availableDocuments,
+						references.map((r) => r.id),
+						mention.query,
+					)
+				: [],
+		[mention.open, mention.query, availableDocuments, references],
+	);
+
+	const insertReferenceRef = useRef<(doc: ConversationDocument) => void>(
+		() => {},
+	);
+
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent<HTMLTextAreaElement>) => {
 			if (mention.open) {
@@ -212,13 +233,42 @@ export function ChatInput({
 					setMention({ open: false, query: "" });
 					return;
 				}
+				if (mentionCandidates.length > 0) {
+					if (e.key === "ArrowDown") {
+						e.preventDefault();
+						setMentionActive((i) => (i + 1) % mentionCandidates.length);
+						return;
+					}
+					if (e.key === "ArrowUp") {
+						e.preventDefault();
+						setMentionActive(
+							(i) =>
+								(i - 1 + mentionCandidates.length) % mentionCandidates.length,
+						);
+						return;
+					}
+					if (e.key === "Enter" && !e.shiftKey) {
+						e.preventDefault();
+						const idx = Math.min(mentionActive, mentionCandidates.length - 1);
+						const doc = mentionCandidates[idx];
+						if (doc) insertReferenceRef.current(doc);
+						return;
+					}
+					if (e.key === "Tab") {
+						e.preventDefault();
+						const idx = Math.min(mentionActive, mentionCandidates.length - 1);
+						const doc = mentionCandidates[idx];
+						if (doc) insertReferenceRef.current(doc);
+						return;
+					}
+				}
 			}
 			if (e.key === "Enter" && !e.shiftKey) {
 				e.preventDefault();
 				void handleSendRef.current();
 			}
 		},
-		[mention.open],
+		[mention.open, mentionCandidates, mentionActive],
 	);
 
 	const handleInput = useCallback(() => {
@@ -234,6 +284,7 @@ export function ChatInput({
 		const match = /(^|\s)@([\w\-. ]*)$/.exec(upToCursor);
 		if (match) {
 			setMention({ open: true, query: match[2] ?? "" });
+			setMentionActive(0);
 		} else {
 			setMention((prev) => (prev.open ? { open: false, query: "" } : prev));
 		}
@@ -292,6 +343,10 @@ export function ChatInput({
 	useEffect(() => {
 		handleSendRef.current = handleSend;
 	}, [handleSend]);
+
+	useEffect(() => {
+		insertReferenceRef.current = insertReferenceAtCursor;
+	}, [insertReferenceAtCursor]);
 
 	const placeholder =
 		availableDocuments.length === 0
@@ -384,11 +439,14 @@ export function ChatInput({
 
 				{mention.open && (
 					<FileMentionPopover
-						query={mention.query}
-						documents={availableDocuments}
-						excludeIds={references.map((r) => r.id)}
+						candidates={mentionCandidates}
+						hasAnyDocuments={availableDocuments.length > 0}
+						activeIndex={Math.min(
+							mentionActive,
+							Math.max(0, mentionCandidates.length - 1),
+						)}
+						onActiveIndexChange={setMentionActive}
 						onPick={insertReferenceAtCursor}
-						onClose={() => setMention({ open: false, query: "" })}
 					/>
 				)}
 

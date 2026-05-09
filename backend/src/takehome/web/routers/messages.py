@@ -161,9 +161,7 @@ def _filter_hallucinated_history(
         if m.role == "assistant" and i > 0:
             prev = history_messages[i - 1]
             had_attachment = (
-                prev.role == "user"
-                and prev.document_ids is not None
-                and len(prev.document_ids) > 0
+                prev.role == "user" and prev.document_ids is not None and len(prev.document_ids) > 0
             )
             if had_attachment and _HALLUCINATED_NO_FILE.search(m.content):
                 continue

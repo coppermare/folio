@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { OnboardingModal } from "./components/OnboardingModal";
+import { ProjectsPage } from "./components/ProjectsPage";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
@@ -56,6 +57,24 @@ export default function App() {
 	const isMobile = useIsMobile();
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
+	const [view, setView] = useState<"chat" | "projects">(() =>
+		typeof window !== "undefined" &&
+		window.location.pathname.startsWith("/projects")
+			? "projects"
+			: "chat",
+	);
+
+	useEffect(() => {
+		const targetPath =
+			view === "projects"
+				? "/projects"
+				: selectedId
+					? `/conversations/${selectedId}`
+					: "/";
+		if (window.location.pathname !== targetPath) {
+			window.history.replaceState(null, "", targetPath);
+		}
+	}, [view, selectedId]);
 
 	useEffect(() => {
 		if (!isMobile) {
@@ -104,17 +123,24 @@ export default function App() {
 	);
 
 	const handleCreate = useCallback(async () => {
+		setView("chat");
 		await create();
 		if (isMobile) setSidebarOpen(false);
 	}, [create, isMobile]);
 
 	const handleSelect = useCallback(
 		(id: string) => {
+			setView("chat");
 			select(id);
 			if (isMobile) setSidebarOpen(false);
 		},
 		[select, isMobile],
 	);
+
+	const handleOpenProjects = useCallback(() => {
+		setView("projects");
+		if (isMobile) setSidebarOpen(false);
+	}, [isMobile]);
 
 	const ensureConversation = useCallback(async () => {
 		if (selectedId) return selectedId;
@@ -132,8 +158,10 @@ export default function App() {
 					conversations={conversations}
 					selectedId={selectedId}
 					loading={conversationsLoading}
+					view={view}
 					onSelect={handleSelect}
 					onCreate={handleCreate}
+					onOpenProjects={handleOpenProjects}
 					onRename={rename}
 					onDelete={remove}
 					isMobile={isMobile}
@@ -141,40 +169,49 @@ export default function App() {
 					onMobileClose={() => setSidebarOpen(false)}
 				/>
 
-				<ChatWindow
-					messages={messages}
-					loading={messagesLoading}
-					error={messagesError}
-					streaming={streaming}
-					streamingContent={streamingContent}
-					streamingSources={streamingSources}
-					streamingReasoning={streamingReasoning}
-					hasDocuments={documents.length > 0}
-					userName={userName}
-					conversationId={selectedId}
-					conversation={selected}
-					documents={documents}
-					ensureConversation={ensureConversation}
-					onSend={handleSend}
-					onUpload={handleUpload}
-					onRename={rename}
-					onDelete={remove}
-					isMobile={isMobile}
-					documentsCount={documents.length}
-					onOpenSidebar={() => setSidebarOpen(true)}
-					onOpenWorkspace={() => setWorkspaceOpen(true)}
-				/>
+				{view === "projects" ? (
+					<ProjectsPage
+						isMobile={isMobile}
+						onOpenSidebar={() => setSidebarOpen(true)}
+					/>
+				) : (
+					<>
+						<ChatWindow
+							messages={messages}
+							loading={messagesLoading}
+							error={messagesError}
+							streaming={streaming}
+							streamingContent={streamingContent}
+							streamingSources={streamingSources}
+							streamingReasoning={streamingReasoning}
+							hasDocuments={documents.length > 0}
+							userName={userName}
+							conversationId={selectedId}
+							conversation={selected}
+							documents={documents}
+							ensureConversation={ensureConversation}
+							onSend={handleSend}
+							onUpload={handleUpload}
+							onRename={rename}
+							onDelete={remove}
+							isMobile={isMobile}
+							documentsCount={documents.length}
+							onOpenSidebar={() => setSidebarOpen(true)}
+							onOpenWorkspace={() => setWorkspaceOpen(true)}
+						/>
 
-				<WorkspacePanel
-					conversationId={selectedId}
-					documents={documents}
-					uploading={uploading}
-					onUpload={handleUpload}
-					onRemove={handleRemoveDocument}
-					isMobile={isMobile}
-					mobileOpen={workspaceOpen}
-					onMobileClose={() => setWorkspaceOpen(false)}
-				/>
+						<WorkspacePanel
+							conversationId={selectedId}
+							documents={documents}
+							uploading={uploading}
+							onUpload={handleUpload}
+							onRemove={handleRemoveDocument}
+							isMobile={isMobile}
+							mobileOpen={workspaceOpen}
+							onMobileClose={() => setWorkspaceOpen(false)}
+						/>
+					</>
+				)}
 			</div>
 			<OnboardingModal
 				open={!hasCompletedOnboarding}

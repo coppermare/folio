@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
+	FolderOpen,
 	MoreHorizontal,
 	PanelLeftClose,
 	PanelLeftOpen,
@@ -25,8 +26,10 @@ interface ChatSidebarProps {
 	conversations: Conversation[];
 	selectedId: string | null;
 	loading: boolean;
+	view: "chat" | "projects";
 	onSelect: (id: string) => void;
 	onCreate: () => void;
+	onOpenProjects: () => void;
 	onRename: (id: string, title: string) => void;
 	onDelete: (id: string) => void;
 	isMobile?: boolean;
@@ -38,8 +41,10 @@ export function ChatSidebar({
 	conversations,
 	selectedId,
 	loading,
+	view,
 	onSelect,
 	onCreate,
+	onOpenProjects,
 	onRename,
 	onDelete,
 	isMobile = false,
@@ -119,6 +124,24 @@ export function ChatSidebar({
 						</TooltipTrigger>
 						<TooltipContent side="right">New chat</TooltipContent>
 					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="ghost"
+								size="iconSm"
+								className={
+									view === "projects"
+										? "bg-neutral-100 text-neutral-700"
+										: "text-neutral-500"
+								}
+								onClick={onOpenProjects}
+								aria-label="Projects"
+							>
+								<FolderOpen className="h-4 w-4" />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent side="right">Projects</TooltipContent>
+					</Tooltip>
 				</div>
 			</div>
 		);
@@ -167,7 +190,7 @@ export function ChatSidebar({
 					</Tooltip>
 				</div>
 
-				<div className="px-2 pt-3">
+				<div className="space-y-0.5 px-2 pt-3">
 					<Button
 						variant="ghost"
 						size="sm"
@@ -176,6 +199,17 @@ export function ChatSidebar({
 					>
 						<Plus className="h-4 w-4" />
 						New Chat
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						className={`w-full justify-start gap-2 px-2 ${
+							view === "projects" ? "bg-neutral-100 text-neutral-900" : ""
+						}`}
+						onClick={onOpenProjects}
+					>
+						<FolderOpen className="h-4 w-4" />
+						Projects
 					</Button>
 				</div>
 
