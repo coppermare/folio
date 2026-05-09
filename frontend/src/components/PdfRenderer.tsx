@@ -201,21 +201,20 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 					<span>
 						Page {currentPage} of {numPages}
 					</span>
-					<div className="inline-flex items-center overflow-hidden rounded-control border border-neutral-200">
+					<div className="inline-flex items-center gap-1">
 						<button
 							type="button"
 							aria-label="Next page"
-							className="flex h-7 w-7 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
+							className="flex h-7 w-7 items-center justify-center rounded-control text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
 							disabled={currentPage >= numPages}
 							onClick={() => handleJump(Math.min(numPages, currentPage + 1))}
 						>
 							<ArrowDown className="h-3.5 w-3.5" />
 						</button>
-						<div className="h-5 w-px bg-neutral-200" />
 						<button
 							type="button"
 							aria-label="Previous page"
-							className="flex h-7 w-7 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
+							className="flex h-7 w-7 items-center justify-center rounded-control text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
 							disabled={currentPage <= 1}
 							onClick={() => handleJump(Math.max(1, currentPage - 1))}
 						>
