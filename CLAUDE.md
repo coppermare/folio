@@ -61,14 +61,15 @@ backend/src/takehome/
   db/session.py        async session factory
   services/            Business logic — keep web-layer-free
     conversation.py
-    document.py        upload, dedup, text extraction (PyMuPDF)
+    document.py        upload, dedup, text extraction (PyMuPDF for PDFs,
+                       python-docx for DOCX, plain read for Markdown)
     llm.py             PydanticAI agent + typed Citation/Answer contract
   web/app.py           FastAPI app + CORS + lifespan (runs migrations)
   web/routers/         conversations, messages, documents
 alembic/versions/      Migrations — keep them reversible
 ```
 
-A conversation has many documents and many messages. Multiple docs per conversation are first-class — the original 1-doc-per-conversation rule was removed. Per-conversation hash dedup (SHA-256 over upload bytes, unique on `(conversation_id, content_hash)`) makes re-uploading the same file a silent no-op; the upload endpoint signals this with `200 OK + X-Duplicate-Upload: true` instead of `201 Created`.
+A conversation has many documents and many messages. Multiple docs per conversation are first-class — the original 1-doc-per-conversation rule was removed. Per-conversation hash dedup (SHA-256 over upload bytes, unique on `(conversation_id, content_hash)`) makes re-uploading the same file a server-side no-op; the upload endpoint signals this with `200 OK + X-Duplicate-Upload: true` instead of `201 Created`. The frontend turns that header into a toast so the user knows the file was already attached.
 
 ### LLM service: the typed contract
 
@@ -99,23 +100,43 @@ The frontend's `useMessages` accumulates `content` chunks into `streamingContent
 
 ```
 frontend/src/
-  App.tsx              composes ChatSidebar | ChatWindow | DocumentViewer
+  App.tsx              composes ChatSidebar | ChatWindow | WorkspacePanel; owns
+                       handleUpload (lazy-creates a conversation when needed)
   types.ts             API DTOs
-  lib/api.ts           fetch wrappers — uploadDocument returns {document, duplicate}
+  lib/
+    api.ts             fetch wrappers — uploadDocument returns {document, duplicate}
+    chat-references.ts pub/sub for "add file reference" + custom-event helpers
+    uploads.ts         supported-extension list + filter helper
   hooks/
     use-conversations.ts
-    use-messages.ts    SSE parser + streamingContent
-    use-documents.ts   multi-doc state: documents[], activeDocumentId, uploadingCount
+    use-messages.ts    SSE parser + streamingContent + streamingSources
+    use-documents.ts   multi-doc state; emits a toast on duplicate uploads
+    use-workspace-tabs.ts  open-tab list + active-tab persistence
+    use-panel-layout.ts    workspace panel width/collapsed state (localStorage)
+    use-user-preferences.ts  first-name + onboarding-completed flag
   components/
-    DocStrip.tsx       chip strip in ChatWindow header
-    ChatWindow.tsx     hosts DocStrip + drag-anywhere upload overlay
-    DocumentViewer.tsx PDF viewer; secondary <select> dropdown when 2+ docs
-    MessageBubble.tsx  per-message attribution + citation pills
-    EmptyState.tsx     full-bleed first-upload tile
-    ChatInput.tsx      textarea + send (no paperclip — upload via drag or DocStrip)
+    ChatWindow.tsx     hosts ChatHeader + messages + ChatInput; owns the
+                       full-area drag-drop overlay (icon + "Drop files to attach")
+    ChatInput.tsx      textarea + send + Plus picker; forwardRef exposing
+                       addFiles so ChatWindow can push dropped files in
+    ChatAttachments.tsx unified chip for both pending uploads and references;
+                        keeps the file extension pinned while truncating the stem
+    WorkspacePanel.tsx right-side panel with Files tab + per-doc viewer tabs;
+                       same drag overlay as ChatWindow; on drop, snaps to Files
+    FileRow.tsx        a row in the Files tab; page-count subtext for PDFs only
+    DocumentViewer.tsx renders a single doc; delegates to PdfRenderer /
+                       DocxRenderer / MarkdownRenderer
+    MessageBubble.tsx  per-message attribution + InlineCitation pills
+    InlineCitation.tsx the citation pill; fires emitOpenDocument + emitJumpToPage
+    FileMentionPopover.tsx @-mention dropdown with keyboard nav
+    OnboardingModal.tsx two-step intro; step bodies stacked in a single grid
+                        cell so dimensions don't change between steps
+    Toaster.tsx        custom-event-driven toast (emitToast); 3s auto-dismiss
+    ProjectsPage.tsx   teaser route at /projects
+    EmptyState.tsx     full-bleed home tile
 ```
 
-UI rule: **uploading a document does NOT auto-switch the viewer.** Append to the chip strip; user keeps their place. Citation-pill → viewer-jump is handled via the citation click flow.
+UI rule: **uploading a document does NOT auto-switch the document viewer.** A drop on the workspace panel snaps the panel to the Files tab, but does not open the dropped doc as an active viewer tab — the user keeps their place. Citation-pill → viewer-jump is the only path that auto-opens a doc tab.
 
 ## Conventions
 
