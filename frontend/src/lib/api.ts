@@ -84,6 +84,7 @@ export async function sendMessage(
 	content: string,
 	documentIds?: string[],
 	userName?: string | null,
+	signal?: AbortSignal,
 ): Promise<Response> {
 	const body: {
 		content: string;
@@ -100,6 +101,7 @@ export async function sendMessage(
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
+		signal,
 	});
 	if (!res.ok) {
 		const text = await res.text().catch(() => "Unknown error");

@@ -36,6 +36,7 @@ export default function App() {
 		streamingSources,
 		streamingReasoning,
 		send,
+		stop,
 	} = useMessages(selectedId);
 
 	const {
@@ -212,6 +213,7 @@ export default function App() {
 							streamingContent={streamingContent}
 							streamingSources={streamingSources}
 							streamingReasoning={streamingReasoning}
+							onStop={stop}
 							hasDocuments={documents.length > 0}
 							userName={userName}
 							conversationId={selectedId}

@@ -126,7 +126,7 @@ export function WorkspacePanel({
 
 			const onMove = (ev: globalThis.MouseEvent) => {
 				const delta = startX - ev.clientX;
-				const dynamicMax = window.innerWidth - 250 - 320; // sidebar - min chat
+				const dynamicMax = window.innerWidth - 250 - 360; // sidebar - min chat
 				setWidth(Math.min(startWidth + delta, dynamicMax));
 			};
 			const onUp = () => {

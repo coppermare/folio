@@ -84,6 +84,7 @@ interface ChatWindowProps {
 		overrideConversationId?: string,
 	) => void | Promise<void>;
 	onUpload: (files: File[]) => Promise<{ id: string; filename: string }[]>;
+	onStop: () => void;
 	onRename: (id: string, title: string) => Promise<void>;
 	onDelete: (id: string) => Promise<void> | void;
 	isMobile?: boolean;
@@ -108,6 +109,7 @@ export function ChatWindow({
 	ensureConversation,
 	onSend,
 	onUpload,
+	onStop,
 	onRename,
 	onDelete,
 	isMobile = false,
@@ -191,7 +193,9 @@ export function ChatWindow({
 					uploadedIds = results.map((r) => r.document.id);
 				}
 			}
-			const documentIds = [...attachments.referenceIds, ...uploadedIds];
+			const documentIds = Array.from(
+				new Set([...attachments.referenceIds, ...uploadedIds]),
+			);
 			await onSend(
 				content,
 				documentIds.length > 0 ? documentIds : undefined,
@@ -280,7 +284,8 @@ export function ChatWindow({
 			<ChatInput
 				ref={inputRef}
 				onSend={handleSend}
-				disabled={streaming}
+				streaming={streaming}
+				onStop={onStop}
 				availableDocuments={documents}
 			/>
 		</div>

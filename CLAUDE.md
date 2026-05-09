@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Document Q&A for commercial real estate lawyers. Users upload legal PDFs (leases, title reports, environmental assessments) into a conversation and ask questions about them; the AI answers grounded in the documents and cites which ones it used.
+Folio is an AI thinking partner for commercial real estate lawyers — grounded in the documents the user trusts. Users drag legal files into a conversation (leases, title reports, environmental assessments, side letters, surveys — whatever a deal pulls in) and ask questions about them. Folio reasons through the loaded sources, streams the reasoning so the user can see how it got there, and cites every claim back to the original page so each answer is verifiable in one click.
 
 Design rationale for user-facing behaviour is documented in `DECISIONS.md` — read it before changing user-facing behaviour.
 

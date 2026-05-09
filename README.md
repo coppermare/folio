@@ -4,7 +4,7 @@
 
 # Folio
 
-Document Q&A for commercial real estate lawyers. Upload legal documents — leases, title reports, environmental assessments — into a conversation and ask questions about them. The AI answers grounded in those documents and cites which pages it pulled from, so a lawyer can verify every claim in one click.
+Folio is an AI thinking partner for commercial real estate lawyers — grounded in the documents you trust. Drag legal files into a conversation (leases, title reports, environmental assessments, side letters, surveys — whatever a deal pulls in) and ask anything about them. Folio reasons through your sources, streams the reasoning so you can see how it got there, and cites every claim back to the original page so each answer is verifiable in one click.
 
 The full reasoning behind each design decision lives in [DECISIONS.md](DECISIONS.md).
 

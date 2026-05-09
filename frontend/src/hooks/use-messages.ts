@@ -11,6 +11,10 @@ export function useMessages(conversationId: string | null) {
 	const [streamingSources, setStreamingSources] = useState<Citation[]>([]);
 	const [streamingReasoning, setStreamingReasoning] = useState("");
 	const abortRef = useRef<AbortController | null>(null);
+	// Conversation id of an in-flight send. Set synchronously inside `send` so
+	// that a `refresh` racing the lazy-conversation-creation path can detect
+	// the optimistic write and avoid clobbering it with the empty server state.
+	const sendingRef = useRef<string | null>(null);
 
 	const refresh = useCallback(async () => {
 		if (!conversationId) {
@@ -21,6 +25,7 @@ export function useMessages(conversationId: string | null) {
 			setLoading(true);
 			setError(null);
 			const data = await api.fetchMessages(conversationId);
+			if (sendingRef.current === conversationId) return;
 			setMessages(data);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load messages");
@@ -51,6 +56,10 @@ export function useMessages(conversationId: string | null) {
 			const cid = overrideConversationId ?? conversationId;
 			if (!cid || streaming) return;
 
+			sendingRef.current = cid;
+			const controller = new AbortController();
+			abortRef.current = controller;
+
 			const userMessage: Message = {
 				id: `temp-${Date.now()}`,
 				conversation_id: cid,
@@ -73,6 +82,7 @@ export function useMessages(conversationId: string | null) {
 					content,
 					documentIds,
 					userName,
+					controller.signal,
 				);
 
 				if (!response.body) {
@@ -203,6 +213,8 @@ export function useMessages(conversationId: string | null) {
 				if (err instanceof DOMException && err.name === "AbortError") return;
 				setError(err instanceof Error ? err.message : "Failed to send message");
 			} finally {
+				sendingRef.current = null;
+				abortRef.current = null;
 				setStreaming(false);
 				setStreamingContent("");
 				setStreamingSources([]);
@@ -211,6 +223,10 @@ export function useMessages(conversationId: string | null) {
 		},
 		[conversationId, streaming],
 	);
+
+	const stop = useCallback(() => {
+		abortRef.current?.abort();
+	}, []);
 
 	return {
 		messages,
@@ -221,6 +237,7 @@ export function useMessages(conversationId: string | null) {
 		streamingSources,
 		streamingReasoning,
 		send,
+		stop,
 		refresh,
 	};
 }

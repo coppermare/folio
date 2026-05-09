@@ -10,7 +10,7 @@ import fitz  # type: ignore[import-untyped]  # PyMuPDF has no type stubs
 import structlog
 from docx import Document as DocxDocument
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from takehome.config import settings
@@ -66,6 +66,17 @@ async def upload_document(
             content_hash=content_hash,
         )
         return UploadResult(document=existing, duplicate=True)
+
+    cap = settings.max_documents_per_conversation
+    count_stmt = select(func.count(Document.id)).where(
+        Document.conversation_id == conversation_id
+    )
+    current_count = (await session.execute(count_stmt)).scalar_one()
+    if current_count >= cap:
+        raise ValueError(
+            f"This conversation already has the maximum of {cap} documents. "
+            f"Remove one before uploading a new file."
+        )
 
     original_filename = file.filename or "document"
     unique_name = f"{uuid.uuid4().hex}_{original_filename}"
