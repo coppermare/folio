@@ -1,4 +1,4 @@
-import { Files, Loader2, Menu } from "lucide-react";
+import { Files, Loader2, Menu, Upload } from "lucide-react";
 import {
 	type DragEvent,
 	useCallback,
@@ -212,12 +212,11 @@ export function ChatWindow({
 			onDrop={handleDrop}
 		>
 			{isDragging && (
-				<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-white/85">
-					<div className="rounded-card border-2 border-dashed border-neutral-400 px-6 py-4">
-						<span className="text-sm font-medium text-neutral-700">
-							Drop files to attach
-						</span>
-					</div>
+				<div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-white/85">
+					<Upload className="h-6 w-6 text-neutral-500" />
+					<span className="text-sm font-medium text-neutral-700">
+						Drop files to attach
+					</span>
 				</div>
 			)}
 			{conversation ? (
