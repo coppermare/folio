@@ -10,6 +10,8 @@ import { useDocuments } from "./hooks/use-documents";
 import { useIsMobile } from "./hooks/use-is-mobile";
 import { useMessages } from "./hooks/use-messages";
 import { useUserPreferences } from "./hooks/use-user-preferences";
+import * as api from "./lib/api";
+import type { ConversationDocument } from "./types";
 
 export default function App() {
 	const {
@@ -103,15 +105,49 @@ export default function App() {
 		[send, refreshConversations, userName],
 	);
 
+	const ensureConversation = useCallback(async () => {
+		if (selectedId) return selectedId;
+		const created = await create();
+		if (created) {
+			refreshDocuments();
+		}
+		return created?.id ?? null;
+	}, [create, selectedId, refreshDocuments]);
+
 	const handleUpload = useCallback(
-		async (files: File[]) => {
-			const uploaded = await uploadMany(files);
-			if (uploaded.length > 0) {
-				refreshConversations();
+		async (files: File[]): Promise<ConversationDocument[]> => {
+			let activeId = selectedId;
+			if (!activeId) {
+				activeId = await ensureConversation();
+				if (!activeId) return [];
 			}
-			return uploaded;
+			if (activeId === selectedId) {
+				const uploaded = await uploadMany(files);
+				if (uploaded.length > 0) refreshConversations();
+				return uploaded;
+			}
+			// Fresh conversation: useDocuments has a stale conversationId in its
+			// closure, so call the API directly and trigger refreshes manually.
+			const results = await Promise.all(
+				files.map((f) => api.uploadDocument(activeId, f)),
+			);
+			refreshConversations();
+			refreshDocuments();
+			return results.map((r) => ({
+				id: r.document.id,
+				filename: r.document.filename,
+				page_count: r.document.page_count,
+				uploaded_at: r.document.uploaded_at,
+				extraction_failed: r.document.extraction_failed,
+			}));
 		},
-		[uploadMany, refreshConversations],
+		[
+			selectedId,
+			ensureConversation,
+			uploadMany,
+			refreshConversations,
+			refreshDocuments,
+		],
 	);
 
 	const handleRemoveDocument = useCallback(
@@ -141,15 +177,6 @@ export default function App() {
 		setView("projects");
 		if (isMobile) setSidebarOpen(false);
 	}, [isMobile]);
-
-	const ensureConversation = useCallback(async () => {
-		if (selectedId) return selectedId;
-		const created = await create();
-		if (created) {
-			refreshDocuments();
-		}
-		return created?.id ?? null;
-	}, [create, selectedId, refreshDocuments]);
 
 	return (
 		<TooltipProvider delayDuration={200}>

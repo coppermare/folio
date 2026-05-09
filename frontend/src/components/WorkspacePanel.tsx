@@ -111,7 +111,7 @@ export function WorkspacePanel({
 								variant="ghost"
 								size="iconSm"
 								className="text-neutral-500"
-								onClick={toggleCollapsed}
+								onClick={expandToReadableWidth}
 								aria-label="Expand workspace"
 							>
 								<PanelRightOpen className="h-4 w-4" />
@@ -257,6 +257,7 @@ export function WorkspacePanel({
 							}}
 							onOpen={openDoc}
 							activeTab={activeTab}
+							panelWidth={isMobile ? undefined : width}
 						/>
 					</TabsContent>
 
@@ -293,6 +294,7 @@ interface FilesTabBodyProps {
 	onRemove: (id: string) => Promise<void> | void;
 	onOpen: (id: string) => void;
 	activeTab: string;
+	panelWidth?: number;
 }
 
 function FilesTabBody({
@@ -303,6 +305,7 @@ function FilesTabBody({
 	onRemove,
 	onOpen,
 	activeTab,
+	panelWidth,
 }: FilesTabBodyProps) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [dragOver, setDragOver] = useState(false);
@@ -329,19 +332,17 @@ function FilesTabBody({
 		handleFiles(e.dataTransfer.files);
 	};
 
-	if (!conversationId) {
-		return (
-			<div className="flex flex-1 items-center justify-center p-6 text-sm text-neutral-400">
-				Select or create a conversation to start uploading files.
-			</div>
-		);
-	}
+	const isNarrow = panelWidth !== undefined && panelWidth < 320;
+	const dropCopy = isNarrow
+		? "Drop or click to upload"
+		: "Drop files here or click to upload";
+	const headerCopy = conversationId ? "Files in this conversation" : "Files";
 
 	return (
 		<div className="flex flex-1 flex-col">
 			<div className="flex items-center justify-between px-3 py-2">
-				<span className="text-xs font-medium text-neutral-500">
-					Files in this conversation
+				<span className="truncate text-xs font-medium text-neutral-500">
+					{headerCopy}
 				</span>
 				<Button
 					variant="ghost"
@@ -376,13 +377,13 @@ function FilesTabBody({
 					<button
 						type="button"
 						onClick={() => fileInputRef.current?.click()}
-						className={`m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card text-center transition-colors ${
+						className={`m-3 flex h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] flex-col items-center justify-center gap-2 rounded-card px-3 text-center transition-colors ${
 							dragOver ? "bg-neutral-100" : "bg-neutral-50 hover:bg-neutral-100"
 						}`}
 					>
-						<FilePlus className="h-5 w-5 text-neutral-400" />
-						<p className="text-sm font-medium text-neutral-600">
-							Drop files here or click to upload
+						<FilePlus className="h-5 w-5 flex-shrink-0 text-neutral-400" />
+						<p className="text-balance text-sm font-medium text-neutral-600">
+							{dropCopy}
 						</p>
 					</button>
 				) : (

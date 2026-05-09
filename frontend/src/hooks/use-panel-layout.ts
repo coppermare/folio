@@ -4,7 +4,7 @@ const STORAGE_KEY = "folio:workspace-layout";
 
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 960;
-const DEFAULT_WIDTH = 440;
+const DEFAULT_WIDTH = 560;
 
 interface Layout {
 	width: number;
