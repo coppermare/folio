@@ -1,4 +1,4 @@
-import { ArrowUp, Plus } from "lucide-react";
+import { ArrowUp, Plus, Square } from "lucide-react";
 import {
 	type ChangeEvent,
 	type ClipboardEvent,
@@ -32,6 +32,7 @@ import {
 	filterMentionCandidates,
 } from "./FileMentionPopover";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 
@@ -44,12 +45,13 @@ interface ChatInputProps {
 		content: string,
 		attachments: { pending: File[]; referenceIds: string[] },
 	) => void | Promise<void>;
-	disabled: boolean;
+	streaming: boolean;
+	onStop: () => void;
 	availableDocuments: ConversationDocument[];
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
-	function ChatInput({ onSend, disabled, availableDocuments }, ref) {
+	function ChatInput({ onSend, streaming, onStop, availableDocuments }, ref) {
 		const [value, setValue] = useState("");
 		const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
 		const [references, setReferences] = useState<ReferenceChip[]>([]);
@@ -92,7 +94,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 						MAX_ATTACHMENTS_PER_MESSAGE
 					) {
 						setWarning(
-							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message.`,
+							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files only.`,
 						);
 						return prev;
 					}
@@ -113,13 +115,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 						MAX_ATTACHMENTS_PER_MESSAGE - prev.length - references.length;
 					if (room <= 0) {
 						setWarning(
-							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message.`,
+							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files only.`,
 						);
 						return prev;
 					}
 					if (filtered.length > room) {
 						setWarning(
-							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files per message. ${filtered.length - room} skipped.`,
+							`You can attach up to ${MAX_ATTACHMENTS_PER_MESSAGE} files only. ${filtered.length - room} skipped.`,
 						);
 					}
 					const accepted = filtered.slice(0, room).map((file) => ({
@@ -280,7 +282,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
 		const handleSend = useCallback(async () => {
 			const trimmed = value.trim();
-			if (disabled) return;
+			if (streaming) return;
 			if (!trimmed && pendingFiles.length === 0 && references.length === 0) {
 				return;
 			}
@@ -300,7 +302,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 				textareaRef.current.style.height = "auto";
 			}
 			void onSend(trimmed, snapshot);
-		}, [value, disabled, pendingFiles, references, onSend]);
+		}, [value, streaming, pendingFiles, references, onSend]);
 
 		useEffect(() => {
 			handleSendRef.current = handleSend;
@@ -316,7 +318,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 				: "Ask a question — type @ to reference a file";
 
 		const canSend =
-			!disabled &&
+			!streaming &&
 			(value.trim().length > 0 ||
 				pendingFiles.length > 0 ||
 				references.length > 0);
@@ -347,7 +349,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 								placeholder={placeholder}
 								rows={1}
 								className="max-h-[240px] w-full resize-none bg-transparent py-0 text-sm leading-5 text-neutral-800 placeholder-neutral-400 outline-none"
-								disabled={disabled}
 							/>
 
 							<div className="flex items-center justify-between pt-1">
@@ -356,9 +357,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 									size="icon"
 									className="h-8 w-8 flex-shrink-0 rounded-full"
 									onClick={() => fileInputRef.current?.click()}
-									disabled={
-										disabled || totalAttachments >= MAX_ATTACHMENTS_PER_MESSAGE
-									}
+									disabled={totalAttachments >= MAX_ATTACHMENTS_PER_MESSAGE}
 									aria-label="Attach files"
 								>
 									<Plus className="h-4 w-4 text-neutral-500" />
@@ -373,15 +372,36 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 									onChange={handleFileChange}
 								/>
 
-								<button
-									type="button"
-									aria-label="Send message"
-									className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400"
-									disabled={!canSend}
-									onClick={() => void handleSend()}
-								>
-									<ArrowUp className="h-4 w-4" />
-								</button>
+								{streaming ? (
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<button
+												type="button"
+												aria-label="Stop generating"
+												className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-800"
+												onClick={onStop}
+											>
+												<Square className="h-3 w-3 fill-current" />
+											</button>
+										</TooltipTrigger>
+										<TooltipContent side="top">Stop generating</TooltipContent>
+									</Tooltip>
+								) : (
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<button
+												type="button"
+												aria-label="Send message"
+												className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400"
+												disabled={!canSend}
+												onClick={() => void handleSend()}
+											>
+												<ArrowUp className="h-4 w-4" />
+											</button>
+										</TooltipTrigger>
+										<TooltipContent side="top">Send message</TooltipContent>
+									</Tooltip>
+								)}
 							</div>
 						</div>
 					</div>

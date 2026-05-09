@@ -53,21 +53,21 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 						<div
 							aria-hidden={step !== 0}
 							className={cn(
-								"transition-opacity duration-200",
+								"flex h-full flex-col transition-opacity duration-200",
 								step === 0 ? "opacity-100" : "pointer-events-none opacity-0",
 							)}
 						>
-							<div className="px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
+							<div className="flex-1 px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
 								<h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
 									Welcome to Folio.
 								</h2>
 								<p className="mt-2 text-sm leading-relaxed text-neutral-600">
-									Document Q&amp;A for commercial real estate lawyers. Upload
-									leases, title reports, and environmental assessments — ask
-									questions, get answers grounded in your files.
+									Your AI thinking partner, grounded in the documents you trust.
+									Bring in the files for whatever you're working on and ask
+									anything.
 								</p>
 							</div>
-							<div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-6 pt-4 sm:px-8">
+							<div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-6 pb-6 pt-4 sm:px-8">
 								<Pagination current={0} onSelect={(i) => setStep(i as 0 | 1)} />
 								<div className="flex items-center gap-2">
 									<Button
@@ -87,11 +87,11 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 							onSubmit={handleSubmit}
 							aria-hidden={step !== 1}
 							className={cn(
-								"transition-opacity duration-200",
+								"flex h-full flex-col transition-opacity duration-200",
 								step === 1 ? "opacity-100" : "pointer-events-none opacity-0",
 							)}
 						>
-							<div className="px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
+							<div className="flex-1 px-6 pb-3 pt-6 sm:px-8 sm:pt-7">
 								<h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
 									What should we call you?
 								</h2>
@@ -109,7 +109,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
 									maxLength={60}
 								/>
 							</div>
-							<div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-6 pt-4 sm:px-8">
+							<div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-6 pb-6 pt-4 sm:px-8">
 								<Pagination current={1} onSelect={(i) => setStep(i as 0 | 1)} />
 								<div className="flex items-center gap-2">
 									<Button

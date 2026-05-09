@@ -37,24 +37,23 @@ export function ProjectsPage({ isMobile, onOpenSidebar }: ProjectsPageProps) {
 				</h1>
 
 				<p className="mt-4 text-base leading-relaxed text-neutral-700">
-					Projects will give every deal its own dedicated workspace in Folio.
-					The lease, title commitment, survey, environmental report, and every
-					related document will live together in one place, ready for as many
-					conversations as your matter requires. From diligence through closing
-					and beyond, the full file set stays with the deal, so each chat opens
-					with the right context already in place.
+					Projects will give every matter its own dedicated workspace in Folio.
+					All the documents for a matter live together in one place, ready for
+					as many conversations as the work requires. The full file set stays
+					with the matter from start to finish, so each chat opens with the
+					right context already in place.
 				</p>
 
 				<div className="mt-10 grid gap-4 sm:grid-cols-3">
 					<FeatureCard
 						icon={<FolderOpen className="h-6 w-6" />}
-						title="One Project per deal"
-						body="A dedicated space for each matter, named however you'd label the closing binder."
+						title="One Project per matter"
+						body="A dedicated space for each matter, named however you'd label it on your desk."
 					/>
 					<FeatureCard
 						icon={<Upload className="h-6 w-6" />}
-						title="Files stay with the deal"
-						body="Your PSA, lease, title, survey, and environmental will live with the Project, not the chat."
+						title="Files stay with the matter"
+						body="Every document for a matter lives with the Project, not the chat."
 					/>
 					<FeatureCard
 						icon={<MessageSquare className="h-6 w-6" />}

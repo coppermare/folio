@@ -53,9 +53,10 @@ export function useDocuments(conversationId: string | null) {
 				);
 				return summary;
 			} catch (err) {
-				setError(
-					err instanceof Error ? err.message : "Failed to upload document",
-				);
+				const msg =
+					err instanceof Error ? err.message : "Failed to upload document";
+				emitToast(msg);
+				setError(msg);
 				return null;
 			} finally {
 				setUploading(false);

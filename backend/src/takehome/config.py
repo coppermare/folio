@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     upload_dir: str = "uploads"
     max_upload_size: int = 25 * 1024 * 1024  # 25MB
+    max_documents_per_conversation: int = 50
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

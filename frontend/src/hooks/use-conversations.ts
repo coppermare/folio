@@ -4,7 +4,11 @@ import type { Conversation } from "../types";
 
 export function useConversations() {
 	const [conversations, setConversations] = useState<Conversation[]>([]);
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useState<string | null>(() => {
+		if (typeof window === "undefined") return null;
+		const m = window.location.pathname.match(/^\/conversations\/([^/]+)$/);
+		return m?.[1] ?? null;
+	});
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
