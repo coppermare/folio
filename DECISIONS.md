@@ -23,9 +23,3 @@ To make the agent feel less like a black box, I surfaced its **reasoning summary
 **Projects.** What lawyers actually need is **context that persists across conversations**: one place where all their files live so they can ask questions across them without re-uploading per session. I sketched this as a "Projects" teaser rather than building it — the right model is a project-level document store that conversations attach to. Out of scope here, but the most valuable thing to build next.
 
 **Creating and editing files with the AI.** Today the agent only reads documents. The natural next step is letting it produce them: drafting a memo, redlining a clause, or generating a summary the user can hand to a client. Markdown is the easy first format — it maps cleanly to how LLMs already think — but the real value is **DOCX and PDF**, since that's what lawyers actually send. If this product gets built out further, file authoring belongs alongside file Q&A.
-
-## Notes on internals
-
-**Citation marker syntax.** The model emits `[cite:N]` markers inline, where `N` is a positional reference into the typed `Answer.sources` array — not the document ID. The earlier `[doc:ID]` form is kept as a regex-only fallback for the unstructured-output code path; the typed `Answer.sources` array is the source of truth for what was cited.
-
-**Naming.** The repo is `folio` but the Postgres database, pyproject package name, and Python imports remain `orbital_takehome` (the original template name). Cosmetic only; renaming would touch alembic, pyproject, every import, and Docker env without changing behaviour. Deferred until there's a non-cosmetic reason.

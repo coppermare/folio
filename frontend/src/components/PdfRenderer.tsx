@@ -205,7 +205,7 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 						<button
 							type="button"
 							aria-label="Next page"
-							className="flex h-7 w-7 items-center justify-center rounded-control text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
+							className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
 							disabled={currentPage >= numPages}
 							onClick={() => handleJump(Math.min(numPages, currentPage + 1))}
 						>
@@ -214,7 +214,7 @@ export function PdfRenderer({ documentId }: PdfRendererProps) {
 						<button
 							type="button"
 							aria-label="Previous page"
-							className="flex h-7 w-7 items-center justify-center rounded-control text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
+							className="flex h-7 w-7 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 disabled:pointer-events-none disabled:opacity-40"
 							disabled={currentPage <= 1}
 							onClick={() => handleJump(Math.max(1, currentPage - 1))}
 						>
