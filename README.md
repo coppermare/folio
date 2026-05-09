@@ -1,4 +1,8 @@
-# folio
+<p align="center">
+  <img src="frontend/public/hero.jpg" alt="Folio" width="100%" />
+</p>
+
+# Folio
 
 Document Q&A for commercial real estate lawyers. Upload legal documents (leases, title reports, environmental assessments) into a conversation and ask questions about them; the AI answers grounded in the documents and cites which ones it used.
 

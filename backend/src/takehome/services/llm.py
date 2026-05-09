@@ -284,8 +284,7 @@ async def chat_with_documents(
         names = ", ".join(f'"{n}"' for n in referenced_filenames)
         if len(referenced_filenames) == 1:
             prompt_parts.append(
-                f"[Attached this turn: {names}. Resolve 'this file', 'this "
-                f"lease', etc. to it.]\n"
+                f"[Attached this turn: {names}. Resolve 'this file', 'this lease', etc. to it.]\n"
             )
         else:
             prompt_parts.append(
